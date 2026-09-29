@@ -3,6 +3,7 @@ FROM python:3.12-slim AS build
 WORKDIR /build
 RUN pip install --no-cache-dir pillow fonttools brotli
 COPY build.py optimize.py ./
+COPY data ./data
 ADD https://cdn.prod.website-files.com/6a90d29afcc3908981f2b9b4/css/oli-sitio.webflow.shared.af3c6f3e2.css webflow.css
 RUN python build.py && python optimize.py site
 
