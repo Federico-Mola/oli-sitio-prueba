@@ -54,7 +54,7 @@ css += """
 .oli-float2 img{width:64px;height:64px;border-radius:50%;object-fit:cover;object-position:50% 25%;box-shadow:rgba(0,0,0,.2) 0 6px 18px;border:3px solid #fff}
 .oli-float2 .bubble{background:#fff;color:#2c2620;font-weight:700;font-size:.85rem;padding:8px 14px;border-radius:999px;box-shadow:rgba(0,0,0,.16) 0 4px 12px;white-space:nowrap;font-family:Karla,sans-serif}
 @media (prefers-reduced-motion:reduce){.oli-float2{transition:none}}
-@media screen and (max-width:479px){.oli-float2 .bubble{display:none}}
+@media screen and (max-width:479px){.oli-float2{gap:8px;max-width:calc(100vw - 24px)}.oli-float2 img{width:48px;height:48px;flex:none}.oli-float2 .bubble{font-size:.78rem;padding:7px 12px;white-space:normal;max-width:62vw;line-height:1.3}}
 """
 (SITE / "css").mkdir(parents=True, exist_ok=True)
 (SITE / "css" / "oli.css").write_text(css)
