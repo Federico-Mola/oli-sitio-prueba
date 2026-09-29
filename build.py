@@ -54,10 +54,28 @@ css += """
 .oli-float2 img{width:64px;height:64px;border-radius:50%;object-fit:cover;object-position:50% 25%;box-shadow:rgba(0,0,0,.2) 0 6px 18px;border:3px solid #fff}
 .oli-float2 .bubble{background:#fff;color:#2c2620;font-weight:700;font-size:.85rem;padding:8px 14px;border-radius:999px;box-shadow:rgba(0,0,0,.16) 0 4px 12px;white-space:nowrap;font-family:Karla,sans-serif}
 @media (prefers-reduced-motion:reduce){.oli-float2{transition:none}}
+.oli-burger{display:none;background:none;border:0;padding:8px;margin-left:4px;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.oli-burger span{display:block;width:24px;height:2px;background:#453f38;margin:5px 0;border-radius:2px;transition:transform .2s,opacity .2s}
+.oli-only-mobile{display:none}
+@media screen and (max-width:991px){.oli-only-mobile{display:block;font-weight:700}}
+@media screen and (max-width:767px){
+.oli-burger{display:block}
+.oli-nav-wrap{flex-wrap:nowrap}
+.oli-nav-wrap>.oli-btn{margin-left:auto;padding:10px 16px;font-size:.85rem}
+.oli-header.menu-open .oli-navlinks{display:flex;flex-direction:column;flex-wrap:nowrap;gap:0;position:absolute;top:100%;left:0;right:0;background:#faf1e1;padding:6px 20px 16px;box-shadow:rgba(0,0,0,.1) 0 12px 20px;max-height:calc(100vh - 80px);overflow-y:auto;z-index:95}
+.oli-header.menu-open .oli-navlink{display:block;padding:13px 0;font-size:1.05rem;border-bottom:1px solid rgba(69,63,56,.1)}
+.oli-header.menu-open .oli-navdrop-toggle::after{content:" ▾";font-size:.8em}
+.oli-header.menu-open .oli-navdrop-item{padding:10px 12px;font-size:.95rem;white-space:normal}
+.oli-header.menu-open .oli-burger span:nth-child(1){transform:translateY(7px) rotate(45deg)}
+.oli-header.menu-open .oli-burger span:nth-child(2){opacity:0}
+.oli-header.menu-open .oli-burger span:nth-child(3){transform:translateY(-7px) rotate(-45deg)}
+}
 @media screen and (max-width:479px){.oli-float2{gap:8px;max-width:calc(100vw - 24px)}.oli-float2 img{width:48px;height:48px;flex:none}.oli-float2 .bubble{font-size:.78rem;padding:7px 12px;white-space:normal;max-width:62vw;line-height:1.3}}
 """
 (SITE / "css").mkdir(parents=True, exist_ok=True)
 (SITE / "css" / "oli.css").write_text(css)
+import hashlib
+CSS_V = hashlib.md5(css.encode()).hexdigest()[:8]
 
 # video (se carga recién cuando entra en pantalla)
 assets.append(("https://cdn.prod.website-files.com/6a90d29afcc3908981f2b9b4/6a917d0f3c816267db826463_oli-video.mp4", "media/oli-video.mp4", 0))
@@ -84,12 +102,13 @@ def header(current):
     for name, path, subs in NAV:
         cur = ' aria-current="page"' if path == current else ""
         if subs:
-            menu = "".join(f'<a href="{link("/lineas-de-producto/" + s)}" class="oli-navdrop-item">{n}</a>' for n, s in subs)
+            menu = f'<a href="{link(path)}" class="oli-navdrop-item oli-only-mobile">Ver todo {name}</a>' + "".join(f'<a href="{link("/lineas-de-producto/" + s)}" class="oli-navdrop-item">{n}</a>' for n, s in subs)
             items.append(f'<div class="oli-navdrop"><a href="{link(path)}" class="oli-navlink oli-navdrop-toggle"{cur}>{name}</a><div class="oli-navdrop-menu">{menu}</div></div>')
         else:
             items.append(f'<a href="{link(path)}" class="oli-navlink{" w--current" if cur else ""}"{cur}>{name}</a>')
     return (f'<header class="oli-header"><div class="oli-nav-wrap"><div class="oli-logo"></div>'
-            f'<nav class="oli-navlinks">{"".join(items)}</nav><a href="{WA}" class="oli-btn">Escribinos por WhatsApp</a></div></header>')
+            f'<nav class="oli-navlinks">{"".join(items)}</nav><a href="{WA}" class="oli-btn">Escribinos por WhatsApp</a>'
+            f'<button class="oli-burger" type="button" aria-label="Abrir menú" aria-expanded="false"><span></span><span></span><span></span></button></div></header>')
 
 FOOTER = f'''<footer class="oli-footer"><div class="oli-footer-wrap"><div class="oli-footer-grid"><div><p class="oli-footer-logo"></p><p class="oli-footer-blurb">Accesorios y objetos hechos a mano, con amor, en Uruguay.</p></div><div><h3 class="oli-footer-h3">Contacto</h3><ul role="list" class="oli-footer-list"><li><a href="{WA}" class="oli-footer-link">WhatsApp</a></li><li><a href="https://www.instagram.com/olihandmadeaccesorios/" class="oli-footer-link">Instagram</a></li></ul></div></div><div class="oli-footer-bottom">La tiendita de Oli — Hecho a mano, con amor.<div class="oli-legal-links"><a href="{WF}/politica-de-privacidad" class="oli-legal-link">Política de Privacidad</a><a href="{WF}/terminos-y-condiciones" class="oli-legal-link">Términos y Condiciones</a><a href="{WF}/politica-de-cambios-y-devoluciones" class="oli-legal-link">Cambios y Devoluciones</a><a href="{WF}/politica-de-envios" class="oli-legal-link">Envíos</a></div></div></div></footer>'''
 
@@ -113,6 +132,8 @@ SCRIPTS = """<div class="oli-float2" id="oliFloat2"><img id="oliFloat2Img" src="
   document.querySelectorAll('.oli-navdrop-toggle').forEach(function(t){
     t.addEventListener('click',function(e){if(window.innerWidth<=991){var p=t.closest('.oli-navdrop');if(p){e.preventDefault();p.classList.toggle('oli-navdrop-open');}}});
   });
+  var hd=document.querySelector('.oli-header'),bg=document.querySelector('.oli-burger');
+  if(hd&&bg){bg.addEventListener('click',function(){var o=hd.classList.toggle('menu-open');bg.setAttribute('aria-expanded',o?'true':'false');bg.setAttribute('aria-label',o?'Cerrar menú':'Abrir menú');});}
   var v=document.querySelector('video[data-src]');
   if(v&&'IntersectionObserver' in window){
     new IntersectionObserver(function(es,o){es.forEach(function(e){if(e.isIntersecting){v.src=v.dataset.src;v.play&&v.play().catch(function(){});o.disconnect();}});},{rootMargin:'200px'}).observe(v);
@@ -131,7 +152,7 @@ def page(title, desc, current, body, extra_head="", wrap=False):
 <meta name="description" content="{desc}">
 <link rel="preload" href="/fonts/Karla-Regular.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/fonts/Caveat-Bold.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/css/oli.css">
+<link rel="stylesheet" href="/css/oli.css?v={CSS_V}">
 <link rel="icon" href="/img/oli-logo.webp">
 {extra_head}
 </head>
