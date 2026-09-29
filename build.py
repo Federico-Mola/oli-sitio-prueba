@@ -92,6 +92,19 @@ css += """
 .oli-wholesale-note{text-align:center;margin:28px 0 0;color:#766c5f;font-size:.95rem}
 .oli-wholesale-note a{color:#c97c79;font-weight:700;text-decoration:none}
 @media screen and (max-width:479px){.oli-models-wrap{padding:0 16px}.oli-model-grid{grid-template-columns:1fr 1fr;gap:12px}.oli-model-body{padding:12px}.oli-model-name{font-size:1rem}.oli-model-desc{display:none}.oli-model-card .oli-btn{padding:10px 8px;font-size:.8rem;white-space:normal;line-height:1.25}}
+.oli-only-phone{display:none}
+@media screen and (max-width:479px){
+.oli-cat-grid{grid-template-columns:1fr 1fr;grid-column-gap:12px;grid-row-gap:12px}
+.oli-cat-card{padding:14px;border-radius:16px}
+.oli-cat-name{font-size:1.15rem}
+.oli-cat-tag{font-size:.6rem}
+.oli-cat-section .oli-h2-script{font-size:1.85rem;line-height:1.15;margin-bottom:24px}
+.oli-slogan{font-size:1.4rem;line-height:1.3}
+.oli-slogan .oli-emoji{font-family:"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif;font-size:.75em;line-height:1;display:inline-block;vertical-align:middle}
+.oli-subpage-img{height:200px;margin-bottom:16px}
+.oli-only-phone{display:inline-block;margin-top:10px}
+.oli-float2 img{width:44px;height:44px;border-width:2px}
+}
 """
 (SITE / "css").mkdir(parents=True, exist_ok=True)
 (SITE / "css" / "oli.css").write_text(css)
@@ -142,15 +155,16 @@ SCRIPTS = """<div class="oli-float2" id="oliFloat2"><img id="oliFloat2Img" src="
   var el=document.getElementById('oliFloat2'),text=document.getElementById('oliFloat2Text');
   var reduced=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   function resetPos(){el.style.top=el.style.bottom=el.style.left=el.style.right='auto';}
+  var phone=window.innerWidth<=767;
   function playScene(){
-    var pos=corners[Math.floor(Math.random()*corners.length)];
+    var pos=phone?{bottom:'16px',left:'12px'}:corners[Math.floor(Math.random()*corners.length)];
     resetPos();Object.keys(pos).forEach(function(k){el.style[k]=pos[k];});
     text.textContent=texts[Math.floor(Math.random()*texts.length)];
     requestAnimationFrame(function(){el.classList.add('show');});
-    setTimeout(function(){el.classList.remove('show');setTimeout(playScene,4000+Math.random()*5000);},3200);
+    setTimeout(function(){el.classList.remove('show');setTimeout(playScene,phone?(20000+Math.random()*10000):(4000+Math.random()*5000));},phone?2000:3200);
   }
   if(reduced){resetPos();el.style.bottom='20px';el.style.right='20px';text.textContent=texts[0];el.classList.add('show');}
-  else setTimeout(playScene,1800);
+  else setTimeout(playScene,phone?6000:1800);
   document.querySelectorAll('.oli-navdrop-toggle').forEach(function(t){
     t.addEventListener('click',function(e){if(window.innerWidth<=991){var p=t.closest('.oli-navdrop');if(p){e.preventDefault();p.classList.toggle('oli-navdrop-open');}}});
   });
@@ -196,7 +210,7 @@ def write(path, content):
 pages = []
 
 # --- Home ---
-HOME_BODY = f'''<div><section class="oli-hero"><div class="oli-hero-wrap"><div class="oli-hero-copy"><p class="oli-eyebrow">Hecho a mano en Uruguay</p><h1 class="oli-h1">Hola, soy Oli y te doy la bienvenida a mi tiendita!</h1><p class="oli-lead">Oli es un producto 100% artesanal, de principio a fin, hecho con todo el amor que llevamos dentro — porque todo lo que podemos brindarte es todo lo que somos.</p><div class="oli-hero-actions"><a href="{WA}" class="oli-btn">Escribinos por WhatsApp</a><a href="#categorias" class="oli-btn-ghost">Ver categorías</a></div><p class="oli-slogan">“En Oli hacemos arte para el pelo, arte en tela, arte para tu hogar y tu vida! ❤️”</p></div><div class="oli-hero-portrait"></div></div></section><div class="oli-trust"><div class="oli-trust-wrap"><span class="oli-trust-item">🧵 100% artesanal</span><span class="oli-trust-item">🏡 Hecho en Uruguay</span><span class="oli-trust-item">📦 Envíos a todo el país</span></div></div></div>
+HOME_BODY = f'''<div><section class="oli-hero"><div class="oli-hero-wrap"><div class="oli-hero-copy"><p class="oli-eyebrow">Hecho a mano en Uruguay</p><h1 class="oli-h1">Hola, soy Oli y te doy la bienvenida a mi tiendita!</h1><p class="oli-lead">Oli es un producto 100% artesanal, de principio a fin, hecho con todo el amor que llevamos dentro — porque todo lo que podemos brindarte es todo lo que somos.</p><div class="oli-hero-actions"><a href="{WA}" class="oli-btn">Escribinos por WhatsApp</a><a href="#categorias" class="oli-btn-ghost">Ver categorías</a></div><p class="oli-slogan">“En Oli hacemos arte para el pelo, arte en tela, arte para tu hogar y tu vida! <span class="oli-emoji">❤️</span>”</p></div><div class="oli-hero-portrait"></div></div></section><div class="oli-trust"><div class="oli-trust-wrap"><span class="oli-trust-item">🧵 100% artesanal</span><span class="oli-trust-item">🏡 Hecho en Uruguay</span><span class="oli-trust-item">📦 Envíos a todo el país</span></div></div></div>
 <section class="oli-featured-section"><p class="oli-featured-eyebrow">Destacado del mes</p><h2 class="oli-featured-title">Moñas Clásicas</h2><p class="oli-featured-desc">Nuestro clásico de siempre — 4 tamaños y 5 tipos para elegir. El favorito de este mes, hecho a mano con todo el cariño de Oli.</p><a href="/lineas-de-producto/monas-clasicas" class="oli-btn">Ver este producto</a></section>
 <section id="categorias" class="oli-cat-section"><div class="oli-section-wrap"><p class="oli-eyebrow oli-eyebrow-center">Nuestras categorías</p><h2 class="oli-h2-script">Cada tipo de magia, en su propio rincón</h2><div class="oli-cat-grid">
 <a id="accesorios" href="/accesorios" class="oli-cat-card oli-cat-mustard"><span class="oli-cat-body"><span class="oli-cat-name oli-cat-name-light">Accesorios</span><span class="oli-cat-tag oli-cat-tag-light">Foto real</span></span></a>
@@ -252,7 +266,7 @@ def models_section(slug):
                   + (f'<div class="oli-model-vars">{vars_}</div>' if vars_ else "")
                   + f'<a href="{wa(msg)}" class="oli-btn">Consultar por WhatsApp</a></div></article>')
     grid = (f'<h2 class="oli-h2-script oli-models-title">Modelos</h2><div class="oli-model-grid">{cards}</div>') if cards else ""
-    return (f'<section class="oli-models-section"><div class="oli-models-wrap">{grid}'
+    return (f'<section class="oli-models-section" id="modelos"><div class="oli-models-wrap">{grid}'
             f'<p class="oli-wholesale-note">Precios por mayor: a acordar con Euge por <a href="{WA}">WhatsApp</a></p></div></section>')
 
 # --- Líneas ---
@@ -263,7 +277,9 @@ for c in CATS:
                 f'<img src="/img/{c["imagen"]}.webp" alt="{_html.escape(l["nombre"])}" class="oli-subpage-img" width="1000" height="1000" loading="eager">'
                 f'<p class="oli-eyebrow oli-eyebrow-center">{c["nombre"]}</p><h1 class="oli-h2-script">{l["nombre"]}</h1>{extra}'
                 f'<div class="oli-editorial-p"><p>{l["descripcion"]}</p></div>'
-                f'<a href="{wa(l["wa_texto"])}" class="oli-btn">Consultar por WhatsApp</a></div></section>'
+                f'<a href="{wa(l["wa_texto"])}" class="oli-btn">Consultar por WhatsApp</a>'
+                + (f'<a href="#modelos" class="oli-btn-ghost oli-only-phone">Ver modelos</a>' if any(m.get("linea") == l["slug"] and m.get("estado") == "publicado" for m in MODELOS) else "")
+                + '</div></section>'
                 + models_section(l["slug"]))
         title = f'{l["nombre"]} | {c["nombre"]} | La tiendita de Oli'
         pages.append(write(line_url(l["slug"]), page(title, l["descripcion"], line_url(l["slug"]), body)))
