@@ -7,7 +7,9 @@ Salida:
 import re, pathlib
 
 ROOT = pathlib.Path(__file__).parent
-SITE = ROOT / "site"
+import os
+SITE = pathlib.Path(os.environ.get("SITE_DIR", ROOT / "site"))
+MODELOS_FILE = pathlib.Path(os.environ.get("MODELOS_FILE", "/data/modelos.json"))
 WF = "https://oli-sitio.webflow.io"
 WA = "https://wa.me/59899383602"
 
@@ -71,6 +73,25 @@ css += """
 .oli-header.menu-open .oli-burger span:nth-child(3){transform:translateY(-7px) rotate(-45deg)}
 }
 @media screen and (max-width:479px){.oli-float2{gap:8px;max-width:calc(100vw - 24px)}.oli-float2 img{width:48px;height:48px;flex:none}.oli-float2 .bubble{font-size:.78rem;padding:7px 12px;white-space:normal;max-width:62vw;line-height:1.3}}
+"""
+css += """
+.oli-models-section{background:#faf1e1;padding:8px 0 64px}
+.oli-models-wrap{max-width:1180px;margin:0 auto;padding:0 32px}
+.oli-models-title{text-align:center;margin:0 0 24px}
+.oli-model-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,280px));justify-content:center;gap:24px}
+.oli-model-card{background:#fff;border-radius:18px;overflow:hidden;box-shadow:rgba(69,63,56,.08) 0 8px 24px;display:flex;flex-direction:column}
+.oli-model-img{width:100%;aspect-ratio:4/5;object-fit:cover;display:block;background:#f3e7d3}
+.oli-model-body{padding:16px 18px 20px;display:flex;flex-direction:column;gap:8px;flex:1}
+.oli-model-name{margin:0;font-family:Fredoka,sans-serif;font-weight:600;font-size:1.15rem;color:#453f38}
+.oli-model-code{font-size:.75rem;letter-spacing:.08em;color:#766c5f;text-transform:uppercase}
+.oli-model-desc{margin:0;font-size:.92rem;line-height:1.55;color:#453f38}
+.oli-model-price{font-family:Fredoka,sans-serif;font-weight:600;font-size:1.25rem;color:#c97c79}
+.oli-model-vars{display:flex;flex-wrap:wrap;gap:6px}
+.oli-model-var{font-size:.8rem;padding:4px 10px;border-radius:999px;background:#f6f1e7;color:#453f38}
+.oli-model-card .oli-btn{margin-top:auto;text-align:center}
+.oli-wholesale-note{text-align:center;margin:28px 0 0;color:#766c5f;font-size:.95rem}
+.oli-wholesale-note a{color:#c97c79;font-weight:700;text-decoration:none}
+@media screen and (max-width:479px){.oli-models-wrap{padding:0 16px}.oli-model-grid{grid-template-columns:1fr 1fr;gap:12px}.oli-model-body{padding:12px}.oli-model-name{font-size:1rem}.oli-model-desc{display:none}.oli-model-card .oli-btn{padding:10px 8px;font-size:.8rem;white-space:normal;line-height:1.25}}
 """
 (SITE / "css").mkdir(parents=True, exist_ok=True)
 (SITE / "css" / "oli.css").write_text(css)
@@ -205,6 +226,35 @@ for c in CATS:
             + f'<a href="{wa(c["wa_texto"])}" class="oli-btn">Consultar por WhatsApp</a></div></section>')
     pages.append(write("/" + c["slug"], page(c["title"], c["meta"], "/" + c["slug"], body)))
 
+# --- Modelos ---
+try:
+    MODELOS = json.loads(MODELOS_FILE.read_text()) if MODELOS_FILE.exists() else []
+except Exception as e:
+    print("Aviso: no se pudo leer", MODELOS_FILE, e)
+    MODELOS = []
+
+def precio_fmt(p):
+    return "$ " + f"{int(p):,}".replace(",", ".")
+
+def models_section(slug):
+    items = [m for m in MODELOS if m.get("linea") == slug and m.get("estado") == "publicado"]
+    cards = ""
+    for m in items:
+        nombre = _html.escape(m["nombre"])
+        fotos = m.get("fotos") or []
+        img = f'<img src="{fotos[0]}" alt="{nombre}" class="oli-model-img" loading="lazy" width="400" height="500">' if fotos else ""
+        vars_ = "".join(f'<span class="oli-model-var">{_html.escape(v)}</span>' for v in m.get("variantes") or [])
+        msg = f'Hola! Quiero consultar por el modelo {m["nombre"]} (código {m["codigo"]})'
+        cards += (f'<article class="oli-model-card" id="{m["codigo"]}">{img}<div class="oli-model-body">'
+                  f'<span class="oli-model-code">Código {m["codigo"]}</span><h3 class="oli-model-name">{nombre}</h3>'
+                  f'<p class="oli-model-desc">{_html.escape(m["descripcion"])}</p>'
+                  f'<span class="oli-model-price">{precio_fmt(m["precio"])}</span>'
+                  + (f'<div class="oli-model-vars">{vars_}</div>' if vars_ else "")
+                  + f'<a href="{wa(msg)}" class="oli-btn">Consultar por WhatsApp</a></div></article>')
+    grid = (f'<h2 class="oli-h2-script oli-models-title">Modelos</h2><div class="oli-model-grid">{cards}</div>') if cards else ""
+    return (f'<section class="oli-models-section"><div class="oli-models-wrap">{grid}'
+            f'<p class="oli-wholesale-note">Precios por mayor: a acordar con Euge por <a href="{WA}">WhatsApp</a></p></div></section>')
+
 # --- Líneas ---
 for c in CATS:
     for l in c["lineas"]:
@@ -213,7 +263,8 @@ for c in CATS:
                 f'<img src="/img/{c["imagen"]}.webp" alt="{_html.escape(l["nombre"])}" class="oli-subpage-img" width="1000" height="1000" loading="eager">'
                 f'<p class="oli-eyebrow oli-eyebrow-center">{c["nombre"]}</p><h1 class="oli-h2-script">{l["nombre"]}</h1>{extra}'
                 f'<div class="oli-editorial-p"><p>{l["descripcion"]}</p></div>'
-                f'<a href="{wa(l["wa_texto"])}" class="oli-btn">Consultar por WhatsApp</a></div></section>')
+                f'<a href="{wa(l["wa_texto"])}" class="oli-btn">Consultar por WhatsApp</a></div></section>'
+                + models_section(l["slug"]))
         title = f'{l["nombre"]} | {c["nombre"]} | La tiendita de Oli'
         pages.append(write(line_url(l["slug"]), page(title, l["descripcion"], line_url(l["slug"]), body)))
 
