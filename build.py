@@ -105,6 +105,14 @@ css += """
 .oli-only-phone{display:inline-block;margin-top:10px}
 .oli-float2 img{width:44px;height:44px;border-width:2px}
 }
+@media screen and (max-width:400px){
+.oli-nav-wrap{padding:12px 14px;gap:8px}
+.oli-logo{width:46px;height:46px}
+.oli-nav-wrap>.oli-btn{padding:9px 12px;font-size:.78rem}
+.oli-burger{padding:6px;margin-left:0}
+.oli-wholesale-wrap .oli-btn{white-space:normal;max-width:100%;text-align:center}
+}
+@media screen and (max-width:359px){.oli-wa-long{display:none}}
 """
 (SITE / "css").mkdir(parents=True, exist_ok=True)
 (SITE / "css" / "oli.css").write_text(css)
@@ -142,7 +150,7 @@ def header(current):
         else:
             items.append(f'<a href="{path}" class="oli-navlink{" w--current" if cur else ""}"{cur}>{c["nombre"]}</a>')
     return (f'<header class="oli-header"><div class="oli-nav-wrap"><a href="/" class="oli-logo" aria-label="Inicio" style="display:block"></a>'
-            f'<nav class="oli-navlinks">{"".join(items)}</nav><a href="{WA}" class="oli-btn">Escribinos por WhatsApp</a>'
+            f'<nav class="oli-navlinks">{"".join(items)}</nav><a href="{WA}" class="oli-btn"><span class="oli-wa-long">Escribinos por </span>WhatsApp</a>'
             f'<button class="oli-burger" type="button" aria-label="Abrir menú" aria-expanded="false"><span></span><span></span><span></span></button></div></header>')
 
 FOOTER = f'''<footer class="oli-footer"><div class="oli-footer-wrap"><div class="oli-footer-grid"><div><p class="oli-footer-logo"></p><p class="oli-footer-blurb">Accesorios y objetos hechos a mano, con amor, en Uruguay.</p></div><div><h3 class="oli-footer-h3">Contacto</h3><ul role="list" class="oli-footer-list"><li><a href="{WA}" class="oli-footer-link">WhatsApp</a></li><li><a href="https://www.instagram.com/olihandmadeaccesorios/" class="oli-footer-link">Instagram</a></li></ul></div></div><div class="oli-footer-bottom">La tiendita de Oli — Hecho a mano, con amor.<div class="oli-legal-links"><a href="/politica-de-privacidad" class="oli-legal-link">Política de Privacidad</a><a href="/terminos-y-condiciones" class="oli-legal-link">Términos y Condiciones</a><a href="/politica-de-cambios-y-devoluciones" class="oli-legal-link">Cambios y Devoluciones</a><a href="/politica-de-envios" class="oli-legal-link">Envíos</a></div></div></div></footer>'''
