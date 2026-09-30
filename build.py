@@ -81,7 +81,7 @@ css += """
 .oli-models-title{text-align:center;margin:0 0 24px}
 .oli-model-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,280px));justify-content:center;gap:24px}
 .oli-model-card{background:#fff;border-radius:18px;overflow:hidden;box-shadow:rgba(69,63,56,.08) 0 8px 24px;display:flex;flex-direction:column}
-.oli-model-img{width:100%;aspect-ratio:4/5;object-fit:cover;display:block;background:#f3e7d3}
+.oli-model-img{width:100%;aspect-ratio:1/1;object-fit:contain;display:block;background:#f3e7d3}
 .oli-model-body{padding:16px 18px 20px;display:flex;flex-direction:column;gap:8px;flex:1}
 .oli-model-name{margin:0;font-family:Fredoka,sans-serif;font-weight:600;font-size:1.15rem;color:#453f38}
 .oli-model-code{font-size:.75rem;letter-spacing:.08em;color:#766c5f;text-transform:uppercase}
@@ -98,7 +98,7 @@ css += """
 .oli-mp-crumbs a{color:#766c5f;text-decoration:none;border-bottom:1px solid rgba(118,108,95,.35)}
 .oli-mp-gallery{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;border-radius:18px;background:#f3e7d3;scrollbar-width:none}
 .oli-mp-gallery::-webkit-scrollbar{display:none}
-.oli-mp-gallery img{flex:0 0 100%;width:100%;aspect-ratio:4/5;object-fit:cover;scroll-snap-align:start;display:block}
+.oli-mp-gallery img{flex:0 0 100%;width:100%;aspect-ratio:1/1;object-fit:contain;scroll-snap-align:start;display:block;background:#f3e7d3}
 .oli-mp-thumbs{display:flex;gap:8px;margin-top:10px;overflow-x:auto;scrollbar-width:none}
 .oli-mp-thumbs a{flex:0 0 64px;height:64px;border-radius:10px;overflow:hidden;border:2px solid transparent}
 .oli-mp-thumbs a:focus,.oli-mp-thumbs a:hover{border-color:#c97c79}
@@ -111,7 +111,7 @@ css += """
 .oli-mp-info .oli-btn{align-self:flex-start}
 .oli-mp-info .oli-wholesale-note{text-align:left;margin:4px 0 0}
 .oli-mp-back{font-size:.9rem;color:#c97c79;font-weight:700;text-decoration:none}
-@media screen and (max-width:767px){.oli-mp-section{padding:16px 0 48px}.oli-mp-wrap{grid-template-columns:1fr;gap:18px;padding:0 16px}.oli-mp-gallery{border-radius:14px}.oli-mp-info .oli-btn{align-self:stretch;text-align:center}.oli-mp-info .oli-h2-script{font-size:1.85rem}}
+@media screen and (max-width:767px){.oli-mp-section{padding:16px 0 48px}.oli-mp-wrap{grid-template-columns:1fr;gap:18px;padding:0 16px}.oli-mp-gallery{border-radius:14px}.oli-mp-gallery img{max-height:60vh}.oli-mp-info .oli-btn{align-self:stretch;text-align:center}.oli-mp-info .oli-h2-script{font-size:1.85rem}}
 .oli-wholesale-note{text-align:center;margin:28px 0 0;color:#766c5f;font-size:.95rem}
 .oli-wholesale-note a{color:#c97c79;font-weight:700;text-decoration:none}
 @media screen and (max-width:479px){.oli-models-wrap{padding:0 16px}.oli-model-grid{grid-template-columns:1fr 1fr;gap:12px}.oli-model-body{padding:12px}.oli-model-name{font-size:1rem}.oli-model-desc{display:none}.oli-model-card .oli-btn{padding:10px 8px;font-size:.8rem;white-space:normal;line-height:1.25}}
@@ -295,7 +295,7 @@ def models_section(slug, cat_slug=None):
     for m in items:
         nombre = _html.escape(m["nombre"])
         fotos = m.get("fotos") or []
-        img = f'<img src="{foto_chica(fotos[0])}" alt="{nombre}" class="oli-model-img" loading="lazy" width="400" height="500">' if fotos else ""
+        img = f'<img src="{foto_chica(fotos[0])}" alt="{nombre}" class="oli-model-img" loading="lazy" width="400" height="400">' if fotos else ""
         vars_ = "".join(f'<span class="oli-model-var">{_html.escape(v)}</span>' for v in m.get("variantes") or [])
         url = modelo_url(m)
         cards += (f'<article class="oli-model-card" id="{m["codigo"]}"><a href="{url}" class="oli-model-link" aria-label="Ver {nombre}">{img}</a><div class="oli-model-body">'
@@ -353,7 +353,7 @@ for m in MODELOS:
     fotos = m.get("fotos") or []
     url = modelo_url(m)
     lazy = ' loading="lazy"'
-    slides = "".join(f'<img id="foto-{i}" src="{f}" alt="{nombre} — foto {i}" width="800" height="1000"{"" if i == 1 else lazy}>'
+    slides = "".join(f'<img id="foto-{i}" src="{f}" alt="{nombre} — foto {i}" width="800" height="800"{"" if i == 1 else lazy}>'
                      for i, f in enumerate(fotos, 1))
     thumbs = "".join(f'<a href="#foto-{i}" aria-label="Ver foto {i}"><img src="{foto_chica(f)}" alt="" width="64" height="64" loading="lazy"></a>'
                      for i, f in enumerate(fotos, 1)) if len(fotos) > 1 else ""
