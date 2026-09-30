@@ -9,7 +9,7 @@ RUN python build.py && python optimize.py site
 
 # Etapa 2: nginx + python para regenerar las páginas con los modelos guardados en /data
 FROM nginx:1.27-alpine
-RUN apk add --no-cache python3
+RUN apk add --no-cache python3 py3-pillow
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /build/site /usr/share/nginx/html
 COPY --from=build /build/build.py /build/webflow.css /app/

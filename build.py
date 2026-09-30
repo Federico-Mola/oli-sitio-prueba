@@ -12,6 +12,7 @@ SITE = pathlib.Path(os.environ.get("SITE_DIR", ROOT / "site"))
 MODELOS_FILE = pathlib.Path(os.environ.get("MODELOS_FILE", "/data/modelos.json"))
 WF = "https://oli-sitio.webflow.io"
 WA = "https://wa.me/59899383602"
+SITE_URL = os.environ.get("SITE_URL", "http://179.198.102.28:8088").rstrip("/")
 
 # ---------- CSS ----------
 css = (ROOT / "webflow.css").read_text()
@@ -89,6 +90,28 @@ css += """
 .oli-model-vars{display:flex;flex-wrap:wrap;gap:6px}
 .oli-model-var{font-size:.8rem;padding:4px 10px;border-radius:999px;background:#f6f1e7;color:#453f38}
 .oli-model-card .oli-btn{margin-top:auto;text-align:center}
+.oli-model-link{display:flex;flex-direction:column;gap:8px;color:inherit;text-decoration:none}
+.oli-model-link:hover .oli-model-name{color:#c97c79}
+.oli-mp-section{background:#faf1e1;padding:32px 0 64px}
+.oli-mp-wrap{max-width:1100px;margin:0 auto;padding:0 32px;display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:40px;align-items:start}
+.oli-mp-crumbs{grid-column:1/-1;font-size:.85rem;color:#766c5f;margin:0}
+.oli-mp-crumbs a{color:#766c5f;text-decoration:none;border-bottom:1px solid rgba(118,108,95,.35)}
+.oli-mp-gallery{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;border-radius:18px;background:#f3e7d3;scrollbar-width:none}
+.oli-mp-gallery::-webkit-scrollbar{display:none}
+.oli-mp-gallery img{flex:0 0 100%;width:100%;aspect-ratio:4/5;object-fit:cover;scroll-snap-align:start;display:block}
+.oli-mp-thumbs{display:flex;gap:8px;margin-top:10px;overflow-x:auto;scrollbar-width:none}
+.oli-mp-thumbs a{flex:0 0 64px;height:64px;border-radius:10px;overflow:hidden;border:2px solid transparent}
+.oli-mp-thumbs a:focus,.oli-mp-thumbs a:hover{border-color:#c97c79}
+.oli-mp-thumbs img{width:100%;height:100%;object-fit:cover;display:block}
+.oli-mp-hint{font-size:.8rem;color:#766c5f;margin:6px 0 0}
+.oli-mp-info{display:flex;flex-direction:column;gap:14px}
+.oli-mp-info .oli-h2-script{margin:0;text-align:left}
+.oli-mp-desc{margin:0;font-size:1rem;line-height:1.65;color:#453f38;white-space:pre-line}
+.oli-mp-info .oli-model-price{font-size:1.6rem}
+.oli-mp-info .oli-btn{align-self:flex-start}
+.oli-mp-info .oli-wholesale-note{text-align:left;margin:4px 0 0}
+.oli-mp-back{font-size:.9rem;color:#c97c79;font-weight:700;text-decoration:none}
+@media screen and (max-width:767px){.oli-mp-section{padding:16px 0 48px}.oli-mp-wrap{grid-template-columns:1fr;gap:18px;padding:0 16px}.oli-mp-gallery{border-radius:14px}.oli-mp-info .oli-btn{align-self:stretch;text-align:center}.oli-mp-info .oli-h2-script{font-size:1.85rem}}
 .oli-wholesale-note{text-align:center;margin:28px 0 0;color:#766c5f;font-size:.95rem}
 .oli-wholesale-note a{color:#c97c79;font-weight:700;text-decoration:none}
 @media screen and (max-width:479px){.oli-models-wrap{padding:0 16px}.oli-model-grid{grid-template-columns:1fr 1fr;gap:12px}.oli-model-body{padding:12px}.oli-model-name{font-size:1rem}.oli-model-desc{display:none}.oli-model-card .oli-btn{padding:10px 8px;font-size:.8rem;white-space:normal;line-height:1.25}}
@@ -258,21 +281,35 @@ except Exception as e:
 def precio_fmt(p):
     return "$ " + f"{int(p):,}".replace(",", ".")
 
+import unicodedata, shutil
+def slugify(t):
+    t = unicodedata.normalize("NFKD", t).encode("ascii", "ignore").decode().lower()
+    return _re.sub(r"[^a-z0-9]+", "-", t).strip("-")[:60] or "modelo"
+
+def modelo_url(m):
+    return f"/modelos/{m['codigo'].lower()}-{slugify(m['nombre'])}"
+
+def foto_chica(p):
+    return p[:-5] + "-600.webp" if p.startswith("/media/modelos/") and p.endswith(".webp") else p
+
+def wa_modelo(m):
+    return wa(f'Hola! Quiero consultar por el modelo {m["nombre"]} (código {m["codigo"]})')
+
 def models_section(slug):
     items = [m for m in MODELOS if m.get("linea") == slug and m.get("estado") == "publicado"]
     cards = ""
     for m in items:
         nombre = _html.escape(m["nombre"])
         fotos = m.get("fotos") or []
-        img = f'<img src="{fotos[0]}" alt="{nombre}" class="oli-model-img" loading="lazy" width="400" height="500">' if fotos else ""
+        img = f'<img src="{foto_chica(fotos[0])}" alt="{nombre}" class="oli-model-img" loading="lazy" width="400" height="500">' if fotos else ""
         vars_ = "".join(f'<span class="oli-model-var">{_html.escape(v)}</span>' for v in m.get("variantes") or [])
-        msg = f'Hola! Quiero consultar por el modelo {m["nombre"]} (código {m["codigo"]})'
-        cards += (f'<article class="oli-model-card" id="{m["codigo"]}">{img}<div class="oli-model-body">'
-                  f'<span class="oli-model-code">Código {m["codigo"]}</span><h3 class="oli-model-name">{nombre}</h3>'
+        url = modelo_url(m)
+        cards += (f'<article class="oli-model-card" id="{m["codigo"]}"><a href="{url}" class="oli-model-link" aria-label="Ver {nombre}">{img}</a><div class="oli-model-body">'
+                  f'<span class="oli-model-code">Código {m["codigo"]}</span><a href="{url}" class="oli-model-link"><h3 class="oli-model-name">{nombre}</h3></a>'
                   f'<p class="oli-model-desc">{_html.escape(m["descripcion"])}</p>'
                   f'<span class="oli-model-price">{precio_fmt(m["precio"])}</span>'
                   + (f'<div class="oli-model-vars">{vars_}</div>' if vars_ else "")
-                  + f'<a href="{wa(msg)}" class="oli-btn">Consultar por WhatsApp</a></div></article>')
+                  + f'<a href="{wa_modelo(m)}" class="oli-btn">Consultar por WhatsApp</a></div></article>')
     grid = (f'<h2 class="oli-h2-script oli-models-title">Modelos</h2><div class="oli-model-grid">{cards}</div>') if cards else ""
     return (f'<section class="oli-models-section" id="modelos"><div class="oli-models-wrap">{grid}'
             f'<p class="oli-wholesale-note">Precios por mayor: a acordar con Euge por <a href="{WA}">WhatsApp</a></p></div></section>')
@@ -291,6 +328,44 @@ for c in CATS:
                 + models_section(l["slug"]))
         title = f'{l["nombre"]} | {c["nombre"]} | La tiendita de Oli'
         pages.append(write(line_url(l["slug"]), page(title, l["descripcion"], line_url(l["slug"]), body)))
+
+# --- Modelos (página propia de cada modelo publicado) ---
+shutil.rmtree(SITE / "modelos", ignore_errors=True)  # así los ocultos dejan de existir (404)
+MEDIA_DIR = MODELOS_FILE.parent / "media"
+LINEAS = {l["slug"]: (c, l) for c in CATS for l in c["lineas"]}
+for m in MODELOS:
+    if m.get("estado") != "publicado" or m.get("linea") not in LINEAS:
+        continue
+    c, l = LINEAS[m["linea"]]
+    nombre = _html.escape(m["nombre"])
+    fotos = m.get("fotos") or []
+    url = modelo_url(m)
+    lazy = ' loading="lazy"'
+    slides = "".join(f'<img id="foto-{i}" src="{f}" alt="{nombre} — foto {i}" width="800" height="1000"{"" if i == 1 else lazy}>'
+                     for i, f in enumerate(fotos, 1))
+    thumbs = "".join(f'<a href="#foto-{i}" aria-label="Ver foto {i}"><img src="{foto_chica(f)}" alt="" width="64" height="64" loading="lazy"></a>'
+                     for i, f in enumerate(fotos, 1)) if len(fotos) > 1 else ""
+    gal = (f'<div><div class="oli-mp-gallery">{slides}</div>'
+           + (f'<div class="oli-mp-thumbs">{thumbs}</div><p class="oli-mp-hint oli-only-phone">Deslizá para ver las {len(fotos)} fotos</p>' if thumbs else "")
+           + '</div>') if fotos else "<div></div>"
+    vars_ = "".join(f'<span class="oli-model-var">{_html.escape(v)}</span>' for v in m.get("variantes") or [])
+    body = (f'<section class="oli-mp-section"><div class="oli-mp-wrap">'
+            f'<p class="oli-mp-crumbs"><a href="/{c["slug"]}">{c["nombre"]}</a> › <a href="{line_url(l["slug"])}">{l["nombre"]}</a></p>'
+            f'{gal}<div class="oli-mp-info"><span class="oli-model-code">Código {m["codigo"]}</span>'
+            f'<h1 class="oli-h2-script">{nombre}</h1><span class="oli-model-price">{precio_fmt(m["precio"])}</span>'
+            f'<p class="oli-mp-desc">{_html.escape(m["descripcion"])}</p>'
+            + (f'<div class="oli-model-vars">{vars_}</div>' if vars_ else "")
+            + f'<a href="{wa_modelo(m)}" class="oli-btn">Consultar por WhatsApp</a>'
+            f'<p class="oli-wholesale-note">Precios por mayor: a acordar con Euge por <a href="{WA}">WhatsApp</a></p>'
+            f'<a href="{line_url(l["slug"])}#modelos" class="oli-mp-back">← Ver más {l["nombre"]}</a></div></div></section>')
+    og_img = f"/media/modelos/{m['codigo']}/og.jpg" if (MEDIA_DIR / "modelos" / m["codigo"] / "og.jpg").exists() else (fotos[0] if fotos else "/img/oli-logo.webp")
+    desc = m["descripcion"][:180]
+    head = (f'<meta property="og:type" content="website"><meta property="og:site_name" content="La tiendita de Oli">'
+            f'<meta property="og:title" content="{nombre} | La tiendita de Oli"><meta property="og:description" content="{_html.escape(desc)}">'
+            f'<meta property="og:image" content="{SITE_URL}{og_img}"><meta property="og:url" content="{SITE_URL}{url}">'
+            f'<meta name="twitter:card" content="summary_large_image">'
+            + (f'<link rel="preload" href="{fotos[0]}" as="image" fetchpriority="high">' if fotos else ""))
+    pages.append(write(url, page(f'{m["nombre"]} | {l["nombre"]} | La tiendita de Oli', desc, line_url(l["slug"]), body, head)))
 
 # --- Legales ---
 def md_to_html(md):
