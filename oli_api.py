@@ -1,8 +1,9 @@
 """Servicio interno de Oli: lleva la conversación del bot de carga y guarda los modelos.
 
 n8n recibe los mensajes de Telegram, controla quién está autorizado y le pasa cada
-mensaje a este servicio (POST /api/bot). El servicio responde con la lista de cosas
-que el bot tiene que contestar ("acciones"), y n8n las manda por Telegram.
+mensaje a este servicio (POST /api/bot). El servicio arma las respuestas ("acciones")
+y las manda directo a Telegram con el token del bot (variable OLI_BOT_TOKEN), porque
+el nodo de Telegram de n8n no puede armar botones que cambian según el caso.
 
 Solo usa la biblioteca estándar de Python. Datos:
   /data/modelos.json   -> modelos (los mismos que usa build.py)
@@ -18,6 +19,7 @@ import os
 import pathlib
 import re
 import sys
+import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 APP = pathlib.Path(__file__).parent
@@ -28,6 +30,8 @@ SESIONES_FILE = DATA / "sesiones.json"
 LOCK_FILE = DATA / ".oli.lock"
 API_KEY = os.environ.get("OLI_API_KEY", "")
 PORT = int(os.environ.get("OLI_API_PORT", "8091"))
+BOT_TOKEN = os.environ.get("OLI_BOT_TOKEN", "")
+TELEGRAM_URL = os.environ.get("OLI_TELEGRAM_URL", "https://api.telegram.org")
 
 MAX_NOMBRE = 80
 MAX_DESCRIPCION = 600
@@ -309,6 +313,36 @@ def terminar(ses, guardar):
     return [vista_previa(nuevo), menu()]
 
 
+# ---------- envío a Telegram ----------
+def telegram(metodo, datos):
+    req = urllib.request.Request(
+        f"{TELEGRAM_URL}/bot{BOT_TOKEN}/{metodo}",
+        data=json.dumps(datos).encode(), headers={"Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=15) as r:
+        return json.loads(r.read())
+
+
+def enviar(update, acciones):
+    """Manda las acciones a Telegram, en orden. Devuelve cuántas se mandaron."""
+    m = update.get("message")
+    cb = update.get("callback_query")
+    chat_id = m["chat"]["id"] if m else cb["message"]["chat"]["id"]
+    for a in acciones:
+        if a["tipo"] == "responder_boton":
+            datos = {"callback_query_id": a["callback_id"]}
+            if a.get("texto"):
+                datos["text"] = a["texto"]
+                datos["show_alert"] = bool(a.get("alerta"))
+            telegram("answerCallbackQuery", datos)
+        else:
+            datos = {"chat_id": chat_id, "text": a["texto"]}
+            if a.get("botones"):
+                datos["reply_markup"] = {"inline_keyboard": [
+                    [{"text": b["texto"], "callback_data": b["data"]} for b in fila] for fila in a["botones"]]}
+            telegram("sendMessage", datos)
+    return len(acciones)
+
+
 # ---------- servidor ----------
 class Handler(BaseHTTPRequestHandler):
     def _json(self, code, obj):
@@ -338,10 +372,12 @@ class Handler(BaseHTTPRequestHandler):
             body = json.loads(self.rfile.read(n) or b"{}")
             update = body.get("update", body)
             acciones = procesar(update)
+            if BOT_TOKEN and acciones:
+                enviar(update, acciones)
         except Exception as e:
             print("Error procesando mensaje:", repr(e), file=sys.stderr, flush=True)
             return self._json(500, {"error": "error interno", "detalle": repr(e)})
-        return self._json(200, {"acciones": acciones})
+        return self._json(200, {"acciones": acciones, "enviado": bool(BOT_TOKEN)})
 
     def log_message(self, fmt, *args):
         print("oli-api:", fmt % args, flush=True)
@@ -350,4 +386,6 @@ class Handler(BaseHTTPRequestHandler):
 if __name__ == "__main__":
     if not API_KEY:
         print("Aviso: falta OLI_API_KEY; el servicio va a rechazar todos los pedidos.", flush=True)
+    if not BOT_TOKEN:
+        print("Aviso: falta OLI_BOT_TOKEN; el servicio arma las respuestas pero no las manda a Telegram.", flush=True)
     ThreadingHTTPServer(("127.0.0.1", PORT), Handler).serve_forever()
