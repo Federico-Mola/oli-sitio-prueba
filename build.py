@@ -81,7 +81,7 @@ css += """
 .oli-models-title{text-align:center;margin:0 0 24px}
 .oli-model-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,280px));justify-content:center;gap:24px}
 .oli-model-card{background:#fff;border-radius:18px;overflow:hidden;box-shadow:rgba(69,63,56,.08) 0 8px 24px;display:flex;flex-direction:column}
-.oli-model-img{width:100%;aspect-ratio:1/1;object-fit:contain;display:block;background:#f3e7d3}
+.oli-model-img{width:100%;height:auto;aspect-ratio:1/1;object-fit:contain;display:block;background:#f3e7d3}
 .oli-model-body{padding:16px 18px 20px;display:flex;flex-direction:column;gap:8px;flex:1}
 .oli-model-name{margin:0;font-family:Fredoka,sans-serif;font-weight:600;font-size:1.15rem;color:#453f38}
 .oli-model-code{font-size:.75rem;letter-spacing:.08em;color:#766c5f;text-transform:uppercase}
@@ -98,7 +98,7 @@ css += """
 .oli-mp-crumbs a{color:#766c5f;text-decoration:none;border-bottom:1px solid rgba(118,108,95,.35)}
 .oli-mp-gallery{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;border-radius:18px;background:#f3e7d3;scrollbar-width:none}
 .oli-mp-gallery::-webkit-scrollbar{display:none}
-.oli-mp-gallery img{flex:0 0 100%;width:100%;aspect-ratio:1/1;object-fit:contain;scroll-snap-align:start;display:block;background:#f3e7d3}
+.oli-mp-gallery img{flex:0 0 100%;width:100%;height:auto;aspect-ratio:1/1;object-fit:contain;scroll-snap-align:start;display:block;background:#f3e7d3}
 .oli-mp-thumbs{display:flex;gap:8px;margin-top:10px;overflow-x:auto;scrollbar-width:none}
 .oli-mp-thumbs a{flex:0 0 64px;height:64px;border-radius:10px;overflow:hidden;border:2px solid transparent}
 .oli-mp-thumbs a:focus,.oli-mp-thumbs a:hover{border-color:#c97c79}
