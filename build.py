@@ -262,15 +262,6 @@ pages.append(write("/", page(
     "/", HOME_BODY,
     '<link rel="preload" href="/img/hola-soy-oli.webp" as="image" fetchpriority="high">', wrap=True)))
 
-# --- Categorías ---
-for c in CATS:
-    chips = "".join(f'<a href="{line_url(l["slug"])}" class="oli-prod-chip">{l.get("menu", l["nombre"])}</a>' for l in sorted(c["lineas"], key=lambda x: x["orden"]))
-    body = (f'<section class="oli-cat-section"><div class="oli-section-wrap"><p class="oli-eyebrow oli-eyebrow-center">{c["nombre"]}</p>'
-            f'<h1 class="oli-h2-script">{c["h1"]}</h1><p class="oli-lead">{c["lead"]}</p>'
-            + (f'<div class="oli-prod-list">{chips}</div>' if chips else "")
-            + f'<a href="{wa(c["wa_texto"])}" class="oli-btn">Consultar por WhatsApp</a></div></section>')
-    pages.append(write("/" + c["slug"], page(c["title"], c["meta"], "/" + c["slug"], body)))
-
 # --- Modelos ---
 try:
     MODELOS = json.loads(MODELOS_FILE.read_text()) if MODELOS_FILE.exists() else []
@@ -295,8 +286,11 @@ def foto_chica(p):
 def wa_modelo(m):
     return wa(f'Hola! Quiero consultar por el modelo {m["nombre"]} (código {m["codigo"]})')
 
-def models_section(slug):
-    items = [m for m in MODELOS if m.get("linea") == slug and m.get("estado") == "publicado"]
+def models_section(slug, cat_slug=None):
+    if cat_slug:  # categoría sin líneas: modelos cargados directo en la categoría
+        items = [m for m in MODELOS if not m.get("linea") and m.get("categoria") == cat_slug and m.get("estado") == "publicado"]
+    else:
+        items = [m for m in MODELOS if m.get("linea") == slug and m.get("estado") == "publicado"]
     cards = ""
     for m in items:
         nombre = _html.escape(m["nombre"])
@@ -313,6 +307,16 @@ def models_section(slug):
     grid = (f'<h2 class="oli-h2-script oli-models-title">Modelos</h2><div class="oli-model-grid">{cards}</div>') if cards else ""
     return (f'<section class="oli-models-section" id="modelos"><div class="oli-models-wrap">{grid}'
             f'<p class="oli-wholesale-note">Precios por mayor: a acordar con Euge por <a href="{WA}">WhatsApp</a></p></div></section>')
+
+# --- Categorías ---
+for c in CATS:
+    chips = "".join(f'<a href="{line_url(l["slug"])}" class="oli-prod-chip">{l.get("menu", l["nombre"])}</a>' for l in sorted(c["lineas"], key=lambda x: x["orden"]))
+    body = (f'<section class="oli-cat-section"><div class="oli-section-wrap"><p class="oli-eyebrow oli-eyebrow-center">{c["nombre"]}</p>'
+            f'<h1 class="oli-h2-script">{c["h1"]}</h1><p class="oli-lead">{c["lead"]}</p>'
+            + (f'<div class="oli-prod-list">{chips}</div>' if chips else "")
+            + f'<a href="{wa(c["wa_texto"])}" class="oli-btn">Consultar por WhatsApp</a></div></section>'
+            + ("" if c["lineas"] else models_section(None, c["slug"])))
+    pages.append(write("/" + c["slug"], page(c["title"], c["meta"], "/" + c["slug"], body)))
 
 # --- Líneas ---
 for c in CATS:
@@ -334,9 +338,17 @@ shutil.rmtree(SITE / "modelos", ignore_errors=True)  # así los ocultos dejan de
 MEDIA_DIR = MODELOS_FILE.parent / "media"
 LINEAS = {l["slug"]: (c, l) for c in CATS for l in c["lineas"]}
 for m in MODELOS:
-    if m.get("estado") != "publicado" or m.get("linea") not in LINEAS:
+    if m.get("estado") != "publicado":
         continue
-    c, l = LINEAS[m["linea"]]
+    if m.get("linea") in LINEAS:
+        c, l = LINEAS[m["linea"]]
+    else:
+        c = next((x for x in CATS if x["slug"] == m.get("categoria") and not x["lineas"]), None)
+        l = None
+        if not c:
+            continue
+    volver = line_url(l["slug"]) if l else "/" + c["slug"]
+    donde = l["nombre"] if l else c["nombre"]
     nombre = _html.escape(m["nombre"])
     fotos = m.get("fotos") or []
     url = modelo_url(m)
@@ -350,14 +362,14 @@ for m in MODELOS:
            + '</div>') if fotos else "<div></div>"
     vars_ = "".join(f'<span class="oli-model-var">{_html.escape(v)}</span>' for v in m.get("variantes") or [])
     body = (f'<section class="oli-mp-section"><div class="oli-mp-wrap">'
-            f'<p class="oli-mp-crumbs"><a href="/{c["slug"]}">{c["nombre"]}</a> › <a href="{line_url(l["slug"])}">{l["nombre"]}</a></p>'
+            f'<p class="oli-mp-crumbs"><a href="/{c["slug"]}">{c["nombre"]}</a>' + (f' › <a href="{volver}">{donde}</a>' if l else "") + '</p>'
             f'{gal}<div class="oli-mp-info"><span class="oli-model-code">Código {m["codigo"]}</span>'
             f'<h1 class="oli-h2-script">{nombre}</h1><span class="oli-model-price">{precio_fmt(m["precio"])}</span>'
             f'<p class="oli-mp-desc">{_html.escape(m["descripcion"])}</p>'
             + (f'<div class="oli-model-vars">{vars_}</div>' if vars_ else "")
             + f'<a href="{wa_modelo(m)}" class="oli-btn">Consultar por WhatsApp</a>'
             f'<p class="oli-wholesale-note">Precios por mayor: a acordar con Euge por <a href="{WA}">WhatsApp</a></p>'
-            f'<a href="{line_url(l["slug"])}#modelos" class="oli-mp-back">← Ver más {l["nombre"]}</a></div></div></section>')
+            f'<a href="{volver}#modelos" class="oli-mp-back">← Ver más {donde}</a></div></div></section>')
     og_img = f"/media/modelos/{m['codigo']}/og.jpg" if (MEDIA_DIR / "modelos" / m["codigo"] / "og.jpg").exists() else (fotos[0] if fotos else "/img/oli-logo.webp")
     desc = m["descripcion"][:180]
     head = (f'<meta property="og:type" content="website"><meta property="og:site_name" content="La tiendita de Oli">'
@@ -365,7 +377,7 @@ for m in MODELOS:
             f'<meta property="og:image" content="{SITE_URL}{og_img}"><meta property="og:url" content="{SITE_URL}{url}">'
             f'<meta name="twitter:card" content="summary_large_image">'
             + (f'<link rel="preload" href="{fotos[0]}" as="image" fetchpriority="high">' if fotos else ""))
-    pages.append(write(url, page(f'{m["nombre"]} | {l["nombre"]} | La tiendita de Oli', desc, line_url(l["slug"]), body, head)))
+    pages.append(write(url, page(f'{m["nombre"]} | {donde} | La tiendita de Oli', desc, volver, body, head)))
 
 # --- Legales ---
 def md_to_html(md):

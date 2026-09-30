@@ -153,7 +153,9 @@ PREGUNTAS = {
     "precio": "¿Cuál es el precio al público? Escribí solo el número, por ejemplo: 1200",
     "variantes": "Si tiene variantes (tamaños, tipos o colores), escribilas separadas por coma.\n"
                  "Por ejemplo: Chica, Mediana, Grande\nSi no tiene, tocá Saltear.",
-    "fotos": f"📷 Ahora mandame las fotos del modelo (hasta {MAX_FOTOS}). Podés mandarlas todas juntas.\n"
+    "fotos": f"📷 Ahora mandame las fotos del modelo (hasta {MAX_FOTOS}).\n"
+             "Tocá el clip 📎 que está al lado de donde escribís, elegí las fotos de la galería y tocá Enviar. "
+             "Podés mandarlas todas juntas.\n"
              "Cuando termines, tocá ✅ Listo.",
 }
 
@@ -176,12 +178,12 @@ def botones_portada(n, portada):
 
 
 def texto_vista_previa(m):
-    cat, lin = buscar_linea(m["linea"])
+    cat, lin = buscar_linea(m["linea"]) if m.get("linea") else (buscar_categoria(m.get("categoria", "")), None)
     lineas = [
         "👀 Vista previa del modelo", "",
         f"Código: {m['codigo']}",
         f"Categoría: {cat['nombre'] if cat else '-'}",
-        f"Línea: {lin['nombre'] if lin else m['linea']}",
+        f"Línea: {lin['nombre'] if lin else '— (va en la página de la categoría)'}",
         f"Nombre: {m['nombre']}",
         f"Descripción: {m['descripcion']}",
         f"Precio: {precio_fmt(m['precio'])}",
@@ -354,6 +356,13 @@ def procesar(update):
                 cat = buscar_categoria(data[4:])
                 if not cat:
                     acciones.append(pedir_categoria())
+                elif not cat["lineas"]:  # categoría sin líneas (ej. Cordones): el modelo va directo a la categoría
+                    ses["modelo"]["categoria"] = cat["slug"]
+                    ses["modelo"]["linea"] = None
+                    ses["paso"] = "nombre"
+                    guardar(ses)
+                    acciones.append(msg(f"Categoría: {cat['nombre']} ✅"))
+                    acciones.append(preguntar("nombre"))
                 else:
                     ses["modelo"]["categoria"] = cat["slug"]
                     ses["paso"] = "linea"
@@ -500,7 +509,8 @@ def terminar(uid, ses, guardar):
     rutas = guardar_fotos_modelo(codigo, [DATA / f["archivo"] for f in orden]) if orden else []
     nuevo = {
         "codigo": codigo,
-        "linea": mod["linea"],
+        "categoria": mod["categoria"],
+        "linea": mod.get("linea"),
         "nombre": mod["nombre"],
         "descripcion": mod["descripcion"],
         "precio": mod["precio"],
