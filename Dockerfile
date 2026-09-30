@@ -13,8 +13,10 @@ RUN apk add --no-cache python3
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /build/site /usr/share/nginx/html
 COPY --from=build /build/build.py /build/webflow.css /app/
+COPY oli_api.py /app/
 COPY data /app/data
 COPY 40-oli-build.sh /docker-entrypoint.d/40-oli-build.sh
-RUN chmod +x /docker-entrypoint.d/40-oli-build.sh
-ENV SITE_DIR=/usr/share/nginx/html MODELOS_FILE=/data/modelos.json
+COPY 45-oli-api.sh /docker-entrypoint.d/45-oli-api.sh
+RUN chmod +x /docker-entrypoint.d/40-oli-build.sh /docker-entrypoint.d/45-oli-api.sh
+ENV SITE_DIR=/usr/share/nginx/html MODELOS_FILE=/data/modelos.json DATA_DIR=/data
 EXPOSE 80
