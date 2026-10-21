@@ -28,6 +28,7 @@ import time
 import urllib.request
 import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from oli_publicacion import PublicacionError, publicar, escribir_json, SITE_URL, ruta_modelo
 
 APP = pathlib.Path(__file__).parent
 DATA = pathlib.Path(os.environ.get("DATA_DIR", "/data"))
@@ -41,6 +42,7 @@ PORT = int(os.environ.get("OLI_API_PORT", "8091"))
 BOT_TOKEN = os.environ.get("OLI_BOT_TOKEN", "")
 TELEGRAM_URL = os.environ.get("OLI_TELEGRAM_URL", "https://api.telegram.org")
 ESPERA_ALBUM = float(os.environ.get("OLI_ESPERA_ALBUM", "2.5"))  # segundos para juntar las fotos de un álbum
+USUARIOS_PERMITIDOS = {x.strip() for x in os.environ.get("OLI_ALLOWED_USER_IDS", "").split(",") if x.strip()}
 
 MAX_NOMBRE = 80
 MAX_DESCRIPCION = 600
@@ -65,16 +67,8 @@ def buscar_linea(slug):
 
 
 def leer_json(path, vacio):
-    try:
-        return json.loads(path.read_text()) if path.exists() else vacio
-    except Exception:
-        return vacio
-
-
-def escribir_json(path, data):
-    tmp = path.with_suffix(".tmp")
-    tmp.write_text(json.dumps(data, ensure_ascii=False, indent=1))
-    os.replace(tmp, path)
+    # Un JSON corrupto debe detener la operación, nunca convertirse en catálogo vacío.
+    return json.loads(path.read_text()) if path.exists() else vacio
 
 
 class Bloqueo:
@@ -129,7 +123,8 @@ def msg(texto, botones=None):
 def menu(nombre=""):
     saludo = f"Hola {nombre} 👋 " if nombre else ""
     return msg(f"{saludo}¿Qué querés hacer?",
-               [[{"texto": "📷 Cargar modelo", "data": "cargar"}, {"texto": "🔎 Buscar modelo", "data": "buscar"}]])
+               [[{"texto": "📷 Cargar modelo", "data": "cargar"}, {"texto": "🔎 Buscar modelo", "data": "buscar"}],
+                [{"texto": "📝 Borradores", "data": "borradores:0"}]])
 
 
 def en_filas(botones, por_fila=2):
@@ -197,15 +192,34 @@ def texto_vista_previa(m):
     if n:
         lineas.append(f"Fotos: {n} (la de arriba es la portada)")
     lineas += ["", "Quedó guardado como borrador: todavía no se ve en el sitio.",
-               "El botón Publicar se suma en la próxima etapa."]
+               "Tocá ✅ Publicar cuando quieras mostrarlo en la tienda."]
     return "\n".join(lineas)
 
 
 def vista_previa(m, portada_tg=None):
     texto = texto_vista_previa(m)
+    botones = [[{"texto": "✅ Publicar", "data": "publicar:" + m["codigo"]}],
+               [{"texto": "📝 Borradores", "data": "borradores:0"}]]
     if portada_tg:
-        return {"tipo": "foto", "file_id": portada_tg, "texto": texto, "botones": []}
-    return msg(texto)
+        return {"tipo": "foto", "file_id": portada_tg, "texto": texto, "botones": botones}
+    return msg(texto, botones)
+
+
+def borradores(pagina=0):
+    modelos = [m for m in reversed(leer_json(MODELOS_FILE, [])) if m.get("estado") == "borrador"]
+    if not modelos:
+        return msg("No tenés modelos pendientes de publicar.")
+    pagina = max(0, min(pagina, (len(modelos) - 1) // 8))
+    bs = [[{"texto": f"{m['codigo']} · {m['nombre'][:45]}", "data": "ver_borrador:" + m["codigo"]}]
+          for m in modelos[pagina * 8:(pagina + 1) * 8]]
+    nav = []
+    if pagina:
+        nav.append({"texto": "← Anteriores", "data": f"borradores:{pagina - 1}"})
+    if (pagina + 1) * 8 < len(modelos):
+        nav.append({"texto": "Más →", "data": f"borradores:{pagina + 1}"})
+    if nav:
+        bs.append(nav)
+    return msg("📝 Elegí el borrador que querés revisar y publicar:", bs)
 
 
 # ---------- fotos ----------
@@ -325,6 +339,9 @@ def procesar(update):
         return []
     frm = (m or cb)["from"]
     uid = str(frm["id"])
+    # n8n ya filtra el acceso; publicar exige además la lista explícita del servicio.
+    if USUARIOS_PERMITIDOS and uid not in USUARIOS_PERMITIDOS:
+        return [msg("Este bot es privado.")]
     nombre = frm.get("first_name", "")
     acciones = []
     if cb:
@@ -345,7 +362,32 @@ def procesar(update):
         # --- botones ---
         if cb:
             data = cb.get("data", "")
-            if data == "cargar":
+            if data.startswith("borradores:"):
+                pagina = data.split(":", 1)[1]
+                acciones.append(borradores(int(pagina) if pagina.isdigit() else 0))
+            elif data.startswith("ver_borrador:"):
+                codigo = data.split(":", 1)[1]
+                modelo = next((x for x in leer_json(MODELOS_FILE, []) if x.get("codigo") == codigo), None)
+                if modelo and modelo.get("estado") == "borrador":
+                    acciones.append(vista_previa(modelo))
+                elif modelo and modelo.get("estado") == "publicado":
+                    acciones.append(msg("Ese modelo ya está publicado:\n" + SITE_URL + ruta_modelo(modelo)))
+                else:
+                    acciones.append(msg("Ese borrador ya no está disponible."))
+            elif data.startswith("publicar:"):
+                if not USUARIOS_PERMITIDOS or uid not in USUARIOS_PERMITIDOS:
+                    acciones.append(msg("No tenés permiso para publicar modelos."))
+                    return acciones
+                try:
+                    modelo, url = publicar(data.split(":", 1)[1], leer_json(MODELOS_FILE, []))
+                    acciones.append(msg(f"✅ {modelo['codigo']} · {modelo['nombre']} ya está publicado.\n\n{url}",
+                                        [[{"texto": "👀 Ver producto", "url": url}]]))
+                except PublicacionError as e:
+                    acciones.append(msg(str(e)))
+                except Exception:
+                    print("Error interno al publicar un modelo; revisar el servicio.", file=sys.stderr, flush=True)
+                    acciones.append(msg("No pude completar la publicación. Volvé a abrir Borradores y reintentá."))
+            elif data == "cargar":
                 limpiar_tmp(uid)
                 guardar({"paso": "categoria", "modelo": {}})
                 acciones.append(pedir_categoria())
@@ -407,6 +449,9 @@ def procesar(update):
 
         # --- mensajes ---
         texto = (m.get("text") or "").strip()
+        if texto.split("@", 1)[0] == "/borradores":
+            acciones.append(borradores())
+            return acciones
         if texto.startswith("/start") or texto.startswith("/menu"):
             limpiar_tmp(uid)
             guardar(None)
@@ -553,7 +598,8 @@ def telegram_archivo(metodo, campos, nombre_campo, nombre_archivo, contenido):
 
 
 def teclado(botones):
-    return {"inline_keyboard": [[{"text": b["texto"], "callback_data": b["data"]} for b in fila] for fila in botones]}
+    return {"inline_keyboard": [[dict(text=b["texto"], **({"url": b["url"]} if "url" in b
+                                  else {"callback_data": b["data"]})) for b in fila] for fila in botones]}
 
 
 def enviar_acciones(chat_id, acciones):
@@ -615,7 +661,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         if self.path == "/api/salud":
-            return self._json(200, {"ok": True})
+            return self._json(200, {"ok": True, "version": "publicar-v1"})
         return self._json(404, {"error": "no encontrado"})
 
     def do_POST(self):
@@ -632,7 +678,7 @@ class Handler(BaseHTTPRequestHandler):
                 enviar_acciones(chat_de(update), acciones)
         except Exception as e:
             print("Error procesando mensaje:", repr(e), file=sys.stderr, flush=True)
-            return self._json(500, {"error": "error interno", "detalle": repr(e)})
+            return self._json(500, {"error": "error interno"})
         salida = [{k: v for k, v in a.items() if k != "bytes"} for a in acciones]
         return self._json(200, {"acciones": salida, "enviado": bool(BOT_TOKEN)})
 

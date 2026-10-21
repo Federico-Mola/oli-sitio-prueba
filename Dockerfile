@@ -13,7 +13,7 @@ RUN apk add --no-cache python3 py3-pillow
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /build/site /usr/share/nginx/html
 COPY --from=build /build/build.py /build/webflow.css /app/
-COPY oli_api.py /app/
+COPY oli_api.py oli_publicacion.py /app/
 COPY data /app/data
 COPY 40-oli-build.sh /docker-entrypoint.d/40-oli-build.sh
 COPY 45-oli-api.sh /docker-entrypoint.d/45-oli-api.sh
