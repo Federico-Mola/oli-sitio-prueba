@@ -1,0 +1,9 @@
+<!doctype html><html lang="es-UY"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Oli · Asistente virtual</title><link rel="stylesheet" href="./chat.css"><link rel="stylesheet" href="./widget.css"><script src="./chat.js" defer></script></head><body class="embedded">
+<button id="oli-launcher" class="launcher" aria-controls="oli-panel" aria-expanded="false"><img src="./personaje-oli.png" alt="" width="64" height="84"><span>Hablá con Oli</span></button>
+<section id="oli-panel" class="panel" aria-label="Conversación con Oli" hidden><header><div><strong>Oli</strong><span>Asistente virtual</span></div><button id="oli-close" aria-label="Cerrar conversación">×</button></header>
+<div id="oli-messages" class="messages" role="log" aria-live="polite" aria-relevant="additions text"></div>
+<p id="oli-status" class="status" role="status"></p>
+<form id="oli-form"><label for="oli-input">Tu mensaje</label><div class="compose"><textarea id="oli-input" rows="2" maxlength="1200" placeholder="¿En qué te puedo ayudar?" required></textarea><button id="oli-send" type="submit">Enviar</button></div></form>
+<button id="oli-contact" class="contact" type="button">Hablar con Euge por WhatsApp</button>
+<div id="oli-handoff" class="handoff" hidden><label for="oli-summary">Revisá o editá tu consulta antes de abrir WhatsApp</label><textarea id="oli-summary" maxlength="700" rows="4"></textarea><p>El mensaje se envía cuando vos lo confirmes en WhatsApp.</p><a id="oli-wa" target="_blank" rel="noopener noreferrer">Abrir WhatsApp</a><button id="oli-cancel" type="button">Volver al chat</button></div>
+<p class="privacy">Tus consultas se procesan con IA de Z.AI. El contexto se elimina tras 24 horas de inactividad. No compartas datos sensibles. <a href="/politica-de-privacidad" target="_blank" rel="noopener">Privacidad</a></p></section></body></html>

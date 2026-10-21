@@ -21,3 +21,8 @@ Prueba para comparar velocidad y calidad contra el sitio en Webflow antes de dec
 - n8n le manda cada mensaje autorizado del bot de Telegram a `POST /api/bot`. El servicio arma las respuestas y las manda directo a Telegram (así puede usar botones que cambian según el caso).
 - Guarda los modelos en `/data/modelos.json` y la carga en curso de cada persona en `/data/sesiones.json`.
 - Pide el encabezado `X-Oli-Key` igual a la variable `OLI_API_KEY`. Usa el token del bot en `OLI_BOT_TOKEN`. Las dos están en el VPS en `/opt/oli-api.env` (solo root, fuera del repo). `GET /api/salud` no pide clave.
+
+
+## Agente Oli publicado
+
+Desde el 21/10/2026 la tienda incluye atención con IA en /oli-asistente/. El servicio propio usa Z.AI y memoria separada del bot de carga. Despliegue persistente de ambos servicios: deploy/compose.yaml. Ver agente/README.md para construcción, controles, privacidad y reversión. El propietario retiró el tope monetario de las pruebas. Mantener las claves y las bases de estado fuera del repositorio.

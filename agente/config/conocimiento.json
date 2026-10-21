@@ -1,0 +1,138 @@
+{
+  "version": "1.0-diseno",
+  "fecha_uruguay": "2026-10-21",
+  "estado": "documentado_no_instalado",
+  "fuente": "Requerimiento del propietario y aclaraciones posteriores atribuidas a Euge",
+  "marca": {
+    "nombre": "La Tiendita de Oli",
+    "lema": "Creamos colores para la vida",
+    "pais": "Uruguay",
+    "tipo": "catalogo_artesanal_por_pedido",
+    "carrito": false,
+    "pago_en_sitio": false,
+    "categorias": [
+      "Accesorios",
+      "Cordones",
+      "Velas",
+      "Oli Colegio",
+      "Navidad",
+      "Pascuas"
+    ]
+  },
+  "contacto": {
+    "web_principal": "https://www.latienditadeoli.com",
+    "instagram": "https://www.instagram.com/olihandmadeaccesorios/",
+    "whatsapp_local": "099 383 602",
+    "whatsapp_internacional": "59899383602",
+    "email_previsto": "soyoli@latienditadeoli.com",
+    "email_habilitado": false,
+    "responsable_humana": "Euge"
+  },
+  "elaboracion": {
+    "principalmente_por_pedido": true,
+    "dias_habituales_min": 2,
+    "dias_habituales_max": 3,
+    "plazo_garantizado": false,
+    "depende_de": [
+      "tipo_de_pedido",
+      "personalizacion",
+      "articulos_preparados"
+    ],
+    "comienza_tras_pago_completo_confirmado_por_euge": true,
+    "minimo_particulares": "sin_minimo",
+    "condiciones_mayoristas": "directamente_con_euge"
+  },
+  "precios": {
+    "fuente": "catalogo_real_publicado_y_aprobado_comercialmente",
+    "caracter": "orientativo",
+    "precio_final_y_descuentos": "confirma_euge",
+    "no_inventar_desglose_por_tamano": true,
+    "modelos_cargados_en_este_archivo": false
+  },
+  "pagos": {
+    "medios": [
+      "transferencia_bancaria",
+      "giro_Abitab",
+      "giro_Redpagos",
+      "similares_coordinados_con_euge"
+    ],
+    "cuentas_o_identificadores_autorizados_para_agente": [],
+    "agente_puede_confirmar_pago": false,
+    "agente_puede_confirmar_pedido": false
+  },
+  "envios": {
+    "solo_uruguay": true,
+    "retiro_en_local": false,
+    "correo_uruguayo_dias_estimados_tras_despacho": [
+      2,
+      3
+    ],
+    "dac_dias_estimados_tras_despacho": [
+      1,
+      2
+    ],
+    "plazo_garantizado": false,
+    "costo_adicional": true,
+    "a_cargo_de": "clienta",
+    "recargo_oli": false,
+    "tarifa": "normal_de_agencia",
+    "importe_anticipo": null,
+    "importe_anticipo_resuelve": "Euge"
+  },
+  "devoluciones": {
+    "politica_informada_por_propietario": "por_falla_del_articulo_hasta_siete_dias_despues_de_entregado",
+    "dias_desde_entrega": 7,
+    "foto_previa_a_envio_para_aprobacion": true,
+    "reclamos_concretos": "revision_con_euge",
+    "agente_autoriza_o_rechaza": false,
+    "costos_retorno": "coordinar_con_euge",
+    "no_usar_foto_previa_para_rechazo_automatico": true,
+    "no_constituye_determinacion_legal": true
+  },
+  "atencion_humana": {
+    "zona_horaria": "America/Montevideo",
+    "dias": "habitualmente_todos",
+    "desde": "08:00",
+    "hasta": "20:00",
+    "respuesta_inmediata_garantizada": false,
+    "fuera_de_horario": "habitualmente_dia_siguiente_sin_hora_prometida"
+  },
+  "facturacion": {
+    "habilitada_segun_propietario": false,
+    "fecha_futura_confirmada": null
+  },
+  "avatar": {
+    "nombre": "Oli",
+    "concepto": "rostro_ficticio_humano_infantil_agenero_inspirado_en_logo",
+    "logo_entregado_para_esta_etapa": true,
+    "generar_antes_del_logo": false,
+    "estado": "segunda_propuesta_pendiente_aprobacion",
+    "archivo_propuesta": "AVATAR/OLI-AVATAR-PROPUESTA-V2.png",
+    "revision_propietario_v1": "demasiado_masculina"
+  },
+  "reglas_comerciales": {
+    "publicacion_y_aprobacion_no_equivalentes": true,
+    "modelos_de_prueba_resuelve": "Euge",
+    "no_modificar_telegram": true,
+    "no_solicitar_telefono_para_derivar": true,
+    "resumen_whatsapp_revisable": true,
+    "envio_por_accion_de_clienta": true,
+    "clic_no_es_pedido_ni_venta": true
+  },
+  "canales_orden": [
+    "web",
+    "instagram",
+    "facebook"
+  ],
+  "despliegue": {
+    "componentes_propios": "VPS_Hostinger_del_propietario",
+    "produccion_agente_autorizada": false
+  },
+  "pendientes": [
+    "aprobacion_avatar",
+    "aprobacion_comercial_de_modelos_con_euge",
+    "limite_gasto_pruebas",
+    "politica_retencion",
+    "cuentas_y_permisos_para_canales_sociales"
+  ]
+}

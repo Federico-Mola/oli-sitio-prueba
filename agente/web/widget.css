@@ -1,0 +1,6 @@
+html:has(body.embedded),body.embedded{background:transparent;margin:0;overflow:hidden}
+.embedded .launcher{right:8px;bottom:8px;height:104px;max-width:calc(100vw - 16px);box-shadow:0 3px 10px #453f3826}
+.embedded .panel{right:8px;bottom:8px;width:calc(100vw - 16px);height:calc(100dvh - 16px)}
+.embedded .panel header{padding:10px 16px}
+.embedded .privacy{font-size:.72rem}
+.embedded .privacy a{color:#654b33}

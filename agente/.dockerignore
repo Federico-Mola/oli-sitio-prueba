@@ -1,0 +1,5 @@
+__pycache__
+tests
+state
+*.sqlite*
+provider.json

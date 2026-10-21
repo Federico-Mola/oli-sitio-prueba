@@ -2,7 +2,7 @@
   "name": "oli",
   "services": {
     "agente": {
-      "image": "oli-agente:produccion-v1",
+      "image": "oli-agente:produccion-v2",
       "container_name": "oli-agente",
       "restart": "unless-stopped",
       "read_only": true,
