@@ -1,0 +1,84 @@
+{
+  "name": "oli",
+  "services": {
+    "agente": {
+      "image": "oli-agente:produccion-v1",
+      "container_name": "oli-agente",
+      "restart": "unless-stopped",
+      "read_only": true,
+      "cap_drop": [
+        "ALL"
+      ],
+      "security_opt": [
+        "no-new-privileges:true"
+      ],
+      "mem_limit": "192m",
+      "cpus": 0.35,
+      "pids_limit": 64,
+      "tmpfs": [
+        "/tmp:rw,noexec,nosuid,size=8m"
+      ],
+      "ports": [
+        "127.0.0.1:8094:8094"
+      ],
+      "volumes": [
+        "/opt/oli-data:/catalogo:ro",
+        "/opt/oli-agent-preview/private/provider.json:/run/oli/provider.json:ro",
+        "/opt/oli-agent-preview/state:/state"
+      ],
+      "environment": {
+        "OLI_PUBLIC_ORIGIN": "https://www.latienditadeoli.com",
+        "OLI_TRUSTED_PROXY_IP": "172.19.0.3"
+      },
+      "networks": {
+        "oli-atencion": {
+          "ipv4_address": "172.19.0.2"
+        }
+      },
+      "healthcheck": {
+        "test": [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8094/api/salud',timeout=3)"
+        ],
+        "interval": "10s",
+        "timeout": "4s",
+        "retries": 5,
+        "start_period": "5s"
+      }
+    },
+    "sitio": {
+      "image": "oli-sitio-prueba:agente-v1",
+      "container_name": "oli-sitio-prueba",
+      "restart": "unless-stopped",
+      "ports": [
+        "8088:80"
+      ],
+      "volumes": [
+        "/opt/oli-data:/data"
+      ],
+      "env_file": [
+        "/opt/oli-api.env"
+      ],
+      "environment": {
+        "SITE_URL": "https://www.latienditadeoli.com"
+      },
+      "networks": {
+        "oli-atencion": {
+          "ipv4_address": "172.19.0.3"
+        }
+      },
+      "depends_on": {
+        "agente": {
+          "condition": "service_healthy"
+        }
+      }
+    }
+  },
+  "networks": {
+    "oli-atencion": {
+      "external": true
+    }
+  }
+}

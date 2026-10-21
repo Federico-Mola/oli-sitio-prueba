@@ -1,7 +1,7 @@
 title: Política de Privacidad | La tiendita de Oli
 meta: Cómo La tiendita de Oli recopila y usa tu información.
 h1: Política de Privacidad
-updated: Última actualización: 28 de agosto de 2026
+updated: Última actualización: 21 de octubre de 2026
 ---
 En Oli (“nosotros”, “la marca”) respetamos tu privacidad y nos comprometemos a proteger los datos personales que nos compartís al navegar este sitio web o al contactarnos por WhatsApp o redes sociales.
 
@@ -57,3 +57,10 @@ Podemos actualizar esta política ocasionalmente. La fecha de la última actuali
 ## 9. Contacto
 
 Ante cualquier duda sobre esta política, podés escribirnos a marunasta@gmail.com o por WhatsApp.
+
+
+## Asistente virtual Oli
+
+El sitio ofrece una conversación con Oli, asistente virtual con inteligencia artificial. Los mensajes se procesan con el proveedor Z.AI para preparar respuestas y se conserva un contexto breve, separado por sesión, durante hasta 24 horas de inactividad; su eliminación se comprueba periódicamente, cada cinco minutos. Se usa una cookie de sesión segura, sin publicidad ni seguimiento entre sitios. No ingreses documentos, datos bancarios, comprobantes o información sensible en el chat. Euge confirma personalmente pedidos, pagos, disponibilidad y soluciones a reclamos.
+
+El botón de contacto permite revisar y editar un texto antes de abrir WhatsApp. El sitio no envía ese mensaje automáticamente ni considera el clic como un pedido confirmado. Los registros técnicos de uso no incluyen el contenido completo de las conversaciones y los identificadores de red usados para limitar abusos se guardan de forma seudonimizada, durante aproximadamente una hora.

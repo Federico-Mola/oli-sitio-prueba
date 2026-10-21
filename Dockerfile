@@ -11,6 +11,7 @@ RUN python build.py && python optimize.py site
 FROM nginx:1.27-alpine
 RUN apk add --no-cache python3 py3-pillow
 COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY oli-agent-proxy.conf /etc/nginx/oli-agent-proxy.conf
 COPY --from=build /build/site /usr/share/nginx/html
 COPY --from=build /build/build.py /build/webflow.css /app/
 COPY oli_api.py oli_publicacion.py /app/

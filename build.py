@@ -178,24 +178,8 @@ def header(current):
 
 FOOTER = f'''<footer class="oli-footer"><div class="oli-footer-wrap"><div class="oli-footer-grid"><div><p class="oli-footer-logo"></p><p class="oli-footer-blurb">Accesorios y objetos hechos a mano, con amor, en Uruguay.</p></div><div><h3 class="oli-footer-h3">Contacto</h3><ul role="list" class="oli-footer-list"><li><a href="{WA}" class="oli-footer-link">WhatsApp</a></li><li><a href="https://www.instagram.com/olihandmadeaccesorios/" class="oli-footer-link">Instagram</a></li></ul></div></div><div class="oli-footer-bottom">La tiendita de Oli — Hecho a mano, con amor.<div class="oli-legal-links"><a href="/politica-de-privacidad" class="oli-legal-link">Política de Privacidad</a><a href="/terminos-y-condiciones" class="oli-legal-link">Términos y Condiciones</a><a href="/politica-de-cambios-y-devoluciones" class="oli-legal-link">Cambios y Devoluciones</a><a href="/politica-de-envios" class="oli-legal-link">Envíos</a></div></div></div></footer>'''
 
-SCRIPTS = """<div class="oli-float2" id="oliFloat2"><img id="oliFloat2Img" src="/img/hola-soy-oli.webp" alt="Oli" width="64" height="64" loading="lazy"><span class="bubble" id="oliFloat2Text"></span></div>
-<script>
+SCRIPTS = """<script>
 (function(){
-  var texts=['¡Hola! Soy Oli 👋','Que tengas un lindo día ✨','¡Qué lindo que me visites! 💛'];
-  var corners=[{top:'18%',left:'6%'},{top:'30%',right:'6%',left:'auto'},{bottom:'14%',left:'8%'},{bottom:'22%',right:'8%',left:'auto'},{top:'55%',left:'4%'}];
-  var el=document.getElementById('oliFloat2'),text=document.getElementById('oliFloat2Text');
-  var reduced=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  function resetPos(){el.style.top=el.style.bottom=el.style.left=el.style.right='auto';}
-  var phone=window.innerWidth<=767;
-  function playScene(){
-    var pos=phone?{bottom:'16px',left:'12px'}:corners[Math.floor(Math.random()*corners.length)];
-    resetPos();Object.keys(pos).forEach(function(k){el.style[k]=pos[k];});
-    text.textContent=texts[Math.floor(Math.random()*texts.length)];
-    requestAnimationFrame(function(){el.classList.add('show');});
-    setTimeout(function(){el.classList.remove('show');setTimeout(playScene,phone?(20000+Math.random()*10000):(4000+Math.random()*5000));},phone?2000:3200);
-  }
-  if(reduced){resetPos();el.style.bottom='20px';el.style.right='20px';text.textContent=texts[0];el.classList.add('show');}
-  else setTimeout(playScene,phone?6000:1800);
   document.querySelectorAll('.oli-navdrop-toggle').forEach(function(t){
     t.addEventListener('click',function(e){if(window.innerWidth<=991){var p=t.closest('.oli-navdrop');if(p){e.preventDefault();p.classList.toggle('oli-navdrop-open');}}});
   });
@@ -206,7 +190,8 @@ SCRIPTS = """<div class="oli-float2" id="oliFloat2"><img id="oliFloat2Img" src="
     new IntersectionObserver(function(es,o){es.forEach(function(e){if(e.isIntersecting){v.src=v.dataset.src;v.play&&v.play().catch(function(){});o.disconnect();}});},{rootMargin:'200px'}).observe(v);
   } else if(v){v.src=v.dataset.src;}
 })();
-</script>"""
+</script>
+<script src="/oli-asistente/embed.js?v=20261021" defer></script>"""
 
 def page(title, desc, current, body, extra_head="", wrap=False):
     open_w, close_w = ('<div class="oli-page">', '</div>') if wrap else ('', '')
