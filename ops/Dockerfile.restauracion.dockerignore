@@ -1,0 +1,11 @@
+privado
+datos
+agente
+operacion
+fuente/.git
+fuente/__pycache__
+fuente/ops
+fuente/.env
+fuente/*.env
+fuente/*.pem
+fuente/provider.json

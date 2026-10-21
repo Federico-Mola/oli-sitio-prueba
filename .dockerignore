@@ -1,0 +1,17 @@
+.git
+__pycache__
+**/__pycache__
+*.pyc
+.env
+*.env
+**/*.env
+*.pem
+**/*.pem
+*.olibak
+provider.json
+**/provider.json
+site
+ops
+test_*.py
+agente
+actualizar_base.py

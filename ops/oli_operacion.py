@@ -78,7 +78,7 @@ def snapshot(dest):
     # Fuente exacta y configuración de operación permiten reconstruir las imágenes.
     deployed=Path('/opt/oli-sitio-prueba')
     if not (deployed/'oli_gestion.py').exists():deployed=Path('/opt/oli-gestion-v2')
-    shutil.copytree(deployed,dest/'fuente',ignore=shutil.ignore_patterns('.git','__pycache__','site','node_modules','*.bundle'))
+    shutil.copytree(deployed,dest/'fuente',ignore=shutil.ignore_patterns('.git','__pycache__','site','node_modules','*.bundle','.env','*.env','*.pem','*.olibak','provider.json'))
     command(['docker','cp','oli-sitio-prueba:/app/webflow.css',str(dest/'fuente/webflow.css')])
     def ignore_operation(folder,names):
         ignored=set(shutil.ignore_patterns('rotacion-privada','*.log','estado*','*.lock','ultimo*','alertas.json','__pycache__')(folder,names))
