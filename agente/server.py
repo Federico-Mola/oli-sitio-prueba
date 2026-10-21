@@ -66,7 +66,7 @@ class Catalog:
         terms = [x for x in re.findall(r'[a-z0-9]+', normal(text)) if len(x) > 3]
         found = []
         for m in models:
-            if not isinstance(m, dict) or m.get('estado') != 'publicado' or m.get('codigo') not in approved:
+            if not isinstance(m, dict) or m.get('estado') != 'publicado' or not (m.get('aprobado_comercialmente') is True or (m.get('codigo') in approved and 'aprobado_comercialmente' not in m)):
                 continue
             code, name = m.get('codigo', ''), m.get('nombre', '')
             if not re.fullmatch(r'(?:ACC|COR|VEL|COL|NAV|PAS)-\d{4,}', code) or not isinstance(name, str) or not name:

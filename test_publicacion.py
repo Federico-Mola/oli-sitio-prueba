@@ -118,15 +118,21 @@ class PublicacionTests(unittest.TestCase):
     def test_json_corrupto_no_se_sobrescribe(self):
         self.file.write_text("{incorrecto")
         actions = api.procesar(self.callback("publicar:VEL-0004"))
-        self.assertIn("No pude completar", actions[-1]["texto"])
+        self.assertTrue(any("No pude completar" in str(x) for x in actions))
         self.assertEqual(self.file.read_text(), "{incorrecto")
 
-    def test_callback_publica_y_devuelve_boton_url(self):
-        actions = api.procesar(self.callback("publicar:VEL-0004"))
-        key = api.teclado(actions[-1]["botones"])["inline_keyboard"][0][0]
-        self.assertEqual(key["text"], "👀 Ver producto")
-        self.assertTrue(key["url"].startswith("https://www.latienditadeoli.com/modelos/"))
-        self.assertNotIn("callback_data", key)
+    def confirmar(self, callback):
+        actions=api.procesar(self.callback(callback))
+        token=actions[-1]['botones'][0][0]['data']
+        self.assertTrue(token.startswith('ok:'))
+        return api.procesar(self.callback(token))
+
+    def test_callback_confirma_antes_de_publicar(self):
+        actions=api.procesar(self.callback('publicar:VEL-0004'))
+        self.assertEqual(json.loads(self.file.read_text())[0]['estado'],'borrador')
+        result=api.procesar(self.callback(actions[-1]['botones'][0][0]['data']))
+        self.assertEqual(json.loads(self.file.read_text())[0]['estado'],'publicado')
+        self.assertTrue(any(b.get('url','').startswith('https://www.latienditadeoli.com/modelos/') for row in result[-1]['botones'] for b in row))
 
     def test_codigo_ajeno_no_publica(self):
         with self.assertRaises(pub.PublicacionError):
@@ -140,11 +146,12 @@ class PublicacionTests(unittest.TestCase):
         self.assertEqual(m["fotos"], self.modelo["fotos"])
 
     def test_dos_clicks_simultaneos_se_serializan(self):
+        actions=api.procesar(self.callback('publicar:VEL-0004'))
+        cb=actions[-1]['botones'][0][0]['data']
         with ThreadPoolExecutor(max_workers=2) as pool:
-            results = list(pool.map(lambda _: api.procesar(self.callback("publicar:VEL-0004")), range(2)))
-        self.assertTrue(all("ya está publicado" in r[-1]["texto"] for r in results))
-        self.assertEqual(len(json.loads(self.file.read_text())), 1)
-        self.assertTrue((self.site / "modelos/vel-0004-grande-azul/index.html").exists())
+            results=list(pool.map(lambda _:api.procesar(self.callback(cb)),range(2)))
+        self.assertEqual(json.loads(self.file.read_text())[0]['estado'],'publicado')
+        self.assertEqual(sum('Cambio guardado' in str(r) for r in results),1)
 
     def test_http_rechaza_sin_clave_y_acepta_callback_autorizado(self):
         with patch.object(api, "API_KEY", "clave-de-prueba"), patch.object(api, "BOT_TOKEN", ""):
@@ -162,7 +169,8 @@ class PublicacionTests(unittest.TestCase):
                 with urllib.request.urlopen(req) as response:
                     result = json.load(response)
                 self.assertFalse(result["enviado"])
-                self.assertIn("ya está publicado", result["acciones"][-1]["texto"])
+                self.assertTrue(result["procesado"])
+                self.assertEqual(json.loads(self.file.read_text())[0]["estado"],"borrador")
             finally:
                 server.shutdown()
                 server.server_close()

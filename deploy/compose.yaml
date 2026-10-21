@@ -2,7 +2,7 @@
   "name": "oli",
   "services": {
     "agente": {
-      "image": "oli-agente:produccion-v2",
+      "image": "oli-agente:produccion-v3",
       "container_name": "oli-agente",
       "restart": "unless-stopped",
       "read_only": true,
@@ -46,14 +46,21 @@
         "timeout": "4s",
         "retries": 5,
         "start_period": "5s"
+      },
+      "logging": {
+        "driver": "json-file",
+        "options": {
+          "max-size": "10m",
+          "max-file": "3"
+        }
       }
     },
     "sitio": {
-      "image": "oli-sitio-prueba:agente-v1",
+      "image": "oli-sitio-prueba:gestion-v2.1",
       "container_name": "oli-sitio-prueba",
       "restart": "unless-stopped",
       "ports": [
-        "8088:80"
+        "172.18.0.1:8088:80"
       ],
       "volumes": [
         "/opt/oli-data:/data"
@@ -72,6 +79,31 @@
       "depends_on": {
         "agente": {
           "condition": "service_healthy"
+        }
+      },
+      "mem_limit": "640m",
+      "cpus": 0.7,
+      "pids_limit": 128,
+      "security_opt": [
+        "no-new-privileges:true"
+      ],
+      "healthcheck": {
+        "test": [
+          "CMD",
+          "python3",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8091/api/salud',timeout=3)"
+        ],
+        "interval": "30s",
+        "timeout": "5s",
+        "retries": 3,
+        "start_period": "10s"
+      },
+      "logging": {
+        "driver": "json-file",
+        "options": {
+          "max-size": "10m",
+          "max-file": "3"
         }
       }
     }

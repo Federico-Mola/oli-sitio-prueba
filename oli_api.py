@@ -18,6 +18,7 @@ import fcntl
 import hmac
 import io
 import json
+import math
 import os
 import pathlib
 import re
@@ -68,7 +69,10 @@ def buscar_linea(slug):
 
 def leer_json(path, vacio):
     # Un JSON corrupto debe detener la operación, nunca convertirse en catálogo vacío.
-    return json.loads(path.read_text()) if path.exists() else vacio
+    try:
+        return json.loads(path.read_text()) if path.exists() else vacio
+    except (json.JSONDecodeError, UnicodeError):
+        raise RuntimeError("Datos no disponibles; se conserva el archivo original") from None
 
 
 class Bloqueo:
@@ -102,7 +106,7 @@ def leer_precio(texto):
         v = float(t)
     except ValueError:
         return None
-    if v <= 0 or v != int(v):
+    if not math.isfinite(v) or v <= 0 or v != int(v):
         return None
     return int(v)
 
@@ -245,7 +249,9 @@ def descargar_de_telegram(file_id, destino):
     info = telegram("getFile", {"file_id": file_id})
     ruta = info["result"]["file_path"]
     with urllib.request.urlopen(f"{TELEGRAM_URL}/file/bot{BOT_TOKEN}/{ruta}", timeout=60) as r:
-        datos = r.read()
+        datos = r.read(20 * 1024 * 1024 + 1)
+    if len(datos) > 20 * 1024 * 1024:
+        raise ValueError("Archivo demasiado grande; usar enlace de subida")
     destino.parent.mkdir(parents=True, exist_ok=True)
     destino.write_bytes(datos)
 
@@ -327,250 +333,29 @@ def resumen_fotos(uid, token):
         enviar_acciones(chat_id, [{"tipo": "foto", "bytes": imagen, "texto": texto,
                                    "botones": botones_portada(len(fotos), portada)}])
     except Exception as e:
-        print("Error mandando el resumen de fotos:", repr(e), file=sys.stderr, flush=True)
+        registrar_error("resumen_fotos")
 
 
-# ---------- conversación ----------
+# ---------- administración actual y errores seguros ----------
+_ERROR_LOCK = threading.Lock()
+
+
+def registrar_error(codigo):
+    codigo = codigo if re.fullmatch(r"[a-z0-9_]{1,64}", codigo) else "error_interno"
+    with _ERROR_LOCK:
+        folder = DATA / "operacion"
+        folder.mkdir(parents=True, exist_ok=True)
+        escribir_json(folder / "ultimo-error.json", {"codigo": codigo, "fecha": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds")})
+    print("oli-error:", codigo, file=sys.stderr, flush=True)
+
+
 def procesar(update):
-    """Recibe un update de Telegram y devuelve la lista de acciones para contestar."""
-    m = update.get("message")
-    cb = update.get("callback_query")
-    if not m and not cb:
-        return []
-    frm = (m or cb)["from"]
-    uid = str(frm["id"])
-    # n8n ya filtra el acceso; publicar exige además la lista explícita del servicio.
-    if USUARIOS_PERMITIDOS and uid not in USUARIOS_PERMITIDOS:
-        return [msg("Este bot es privado.")]
-    nombre = frm.get("first_name", "")
-    acciones = []
-    if cb:
-        acciones.append({"tipo": "responder_boton", "callback_id": cb["id"], "texto": ""})
-
-    with Bloqueo():
-        sesiones = leer_json(SESIONES_FILE, {})
-        ses = sesiones.get(uid)
-
-        def guardar(s):
-            if s is None:
-                sesiones.pop(uid, None)
-            else:
-                s["actualizado"] = datetime.datetime.now().isoformat(timespec="seconds")
-                sesiones[uid] = s
-            escribir_json(SESIONES_FILE, sesiones)
-
-        # --- botones ---
-        if cb:
-            data = cb.get("data", "")
-            if data.startswith("borradores:"):
-                pagina = data.split(":", 1)[1]
-                acciones.append(borradores(int(pagina) if pagina.isdigit() else 0))
-            elif data.startswith("ver_borrador:"):
-                codigo = data.split(":", 1)[1]
-                modelo = next((x for x in leer_json(MODELOS_FILE, []) if x.get("codigo") == codigo), None)
-                if modelo and modelo.get("estado") == "borrador":
-                    acciones.append(vista_previa(modelo))
-                elif modelo and modelo.get("estado") == "publicado":
-                    acciones.append(msg("Ese modelo ya está publicado:\n" + SITE_URL + ruta_modelo(modelo)))
-                else:
-                    acciones.append(msg("Ese borrador ya no está disponible."))
-            elif data.startswith("publicar:"):
-                if not USUARIOS_PERMITIDOS or uid not in USUARIOS_PERMITIDOS:
-                    acciones.append(msg("No tenés permiso para publicar modelos."))
-                    return acciones
-                try:
-                    modelo, url = publicar(data.split(":", 1)[1], leer_json(MODELOS_FILE, []))
-                    acciones.append(msg(f"✅ {modelo['codigo']} · {modelo['nombre']} ya está publicado.\n\n{url}",
-                                        [[{"texto": "👀 Ver producto", "url": url}]]))
-                except PublicacionError as e:
-                    acciones.append(msg(str(e)))
-                except Exception:
-                    print("Error interno al publicar un modelo; revisar el servicio.", file=sys.stderr, flush=True)
-                    acciones.append(msg("No pude completar la publicación. Volvé a abrir Borradores y reintentá."))
-            elif data == "cargar":
-                limpiar_tmp(uid)
-                guardar({"paso": "categoria", "modelo": {}})
-                acciones.append(pedir_categoria())
-            elif data == "buscar":
-                acciones[0]["texto"] = "Esta opción se habilita en una próxima etapa."
-                acciones[0]["alerta"] = True
-            elif data.startswith("cat:") and ses and ses["paso"] == "categoria":
-                cat = buscar_categoria(data[4:])
-                if not cat:
-                    acciones.append(pedir_categoria())
-                elif not cat["lineas"]:  # categoría sin líneas (ej. Cordones): el modelo va directo a la categoría
-                    ses["modelo"]["categoria"] = cat["slug"]
-                    ses["modelo"]["linea"] = None
-                    ses["paso"] = "nombre"
-                    guardar(ses)
-                    acciones.append(msg(f"Categoría: {cat['nombre']} ✅"))
-                    acciones.append(preguntar("nombre"))
-                else:
-                    ses["modelo"]["categoria"] = cat["slug"]
-                    ses["paso"] = "linea"
-                    guardar(ses)
-                    acciones.append(pedir_linea(cat))
-            elif data.startswith("lin:") and ses and ses["paso"] == "linea":
-                cat, lin = buscar_linea(data[4:])
-                if not lin or cat["slug"] != ses["modelo"].get("categoria"):
-                    acciones.append(pedir_linea(buscar_categoria(ses["modelo"]["categoria"])))
-                else:
-                    ses["modelo"]["linea"] = lin["slug"]
-                    ses["paso"] = "nombre"
-                    guardar(ses)
-                    acciones.append(msg(f"Línea: {lin['nombre']} ✅"))
-                    acciones.append(preguntar("nombre"))
-            elif data == "saltar_variantes" and ses and ses["paso"] == "variantes":
-                ses["modelo"]["variantes"] = []
-                ses["paso"] = "fotos"
-                ses["chat_id"] = cb["message"]["chat"]["id"]
-                guardar(ses)
-                acciones.append(preguntar("fotos"))
-            elif data.startswith("portada:") and ses and ses["paso"] == "fotos":
-                fotos = ses["modelo"].get("fotos_tmp", [])
-                i = int(data.split(":")[1])
-                if 0 <= i < len(fotos):
-                    ses["modelo"]["portada"] = i
-                    guardar(ses)
-                    acciones[0]["texto"] = f"La foto {i + 1} va de portada ⭐"
-                    acciones.append({"tipo": "editar_botones", "message_id": cb["message"]["message_id"],
-                                     "botones": botones_portada(len(fotos), i)})
-            elif data == "fotos_listo" and ses and ses["paso"] == "fotos":
-                if not ses["modelo"].get("fotos_tmp"):
-                    acciones[0]["texto"] = "Falta al menos una foto."
-                    acciones.append(msg("Necesito al menos una foto del modelo para seguir. Mandámela y después tocá ✅ Listo.",
-                                        [[BOTON_LISTO]]))
-                else:
-                    acciones += terminar(uid, ses, guardar)
-            else:
-                acciones[0]["texto"] = "Ese botón ya no está activo."
-                acciones.append(continuar(ses, nombre))
-            return acciones
-
-        # --- mensajes ---
-        texto = (m.get("text") or "").strip()
-        if texto.split("@", 1)[0] == "/borradores":
-            acciones.append(borradores())
-            return acciones
-        if texto.startswith("/start") or texto.startswith("/menu"):
-            limpiar_tmp(uid)
-            guardar(None)
-            acciones.append(menu(nombre))
-            return acciones
-        if not ses:
-            acciones.append(menu(nombre))
-            return acciones
-        paso = ses["paso"]
-
-        if paso == "fotos":
-            file_id, tipo = foto_de_mensaje(m)
-            if tipo == "foto":
-                fotos = ses["modelo"].setdefault("fotos_tmp", [])
-                if len(fotos) >= MAX_FOTOS:
-                    ses["fotos_excedidas"] = ses.get("fotos_excedidas", 0) + 1
-                else:
-                    nombre_arch = f"media/tmp/{uid}/{m['message_id']}-{uuid.uuid4().hex[:6]}.jpg"
-                    descargar_de_telegram(file_id, DATA / nombre_arch)
-                    fotos.append({"file_id": file_id, "msg": m["message_id"], "archivo": nombre_arch})
-                    fotos.sort(key=lambda f: f["msg"])
-                ses["fotos_token"] = uuid.uuid4().hex
-                ses["chat_id"] = m["chat"]["id"]
-                guardar(ses)
-                threading.Thread(target=resumen_fotos, args=(uid, ses["fotos_token"]), daemon=True).start()
-                return acciones  # el resumen sale cuando terminan de llegar las fotos del álbum
-            if tipo == "video":
-                acciones.append(msg("Los videos se van a poder subir en una próxima etapa. Por ahora mandame fotos.",
-                                    [[BOTON_LISTO]]))
-                return acciones
-            if tipo == "otro":
-                acciones.append(msg("Ese archivo no lo puedo usar: no es una foto y no lo guardé. "
-                                    "Mandame fotos del modelo.", [[BOTON_LISTO]]))
-                return acciones
-            acciones.append(msg("Mandame las fotos del modelo, o tocá ✅ Listo si ya terminaste.", [[BOTON_LISTO]]))
-            return acciones
-
-        if paso in ("categoria", "linea"):
-            acciones.append(msg("Elegí una opción con los botones de arriba."))
-            acciones.append(pedir_categoria() if paso == "categoria"
-                            else pedir_linea(buscar_categoria(ses["modelo"]["categoria"])))
-            return acciones
-        if not texto:
-            acciones.append(msg("Necesito que me lo escribas como texto."))
-            acciones.append(preguntar(paso))
-            return acciones
-        mod = ses["modelo"]
-        if paso == "nombre":
-            if len(texto) > MAX_NOMBRE:
-                acciones.append(msg(f"El nombre es muy largo (máximo {MAX_NOMBRE} letras). Probá con uno más corto."))
-                return acciones
-            mod["nombre"] = texto
-            ses["paso"] = "descripcion"
-        elif paso == "descripcion":
-            if len(texto) < 3:
-                acciones.append(msg("La descripción es obligatoria."))
-                acciones.append(preguntar("descripcion"))
-                return acciones
-            if len(texto) > MAX_DESCRIPCION:
-                acciones.append(msg(f"La descripción es muy larga (máximo {MAX_DESCRIPCION} letras). Probá acortarla."))
-                return acciones
-            mod["descripcion"] = texto
-            ses["paso"] = "precio"
-        elif paso == "precio":
-            p = leer_precio(texto)
-            if p is None:
-                acciones.append(msg("No entendí el precio. Escribí solo el número, sin centavos. Por ejemplo: 1200"))
-                return acciones
-            mod["precio"] = p
-            ses["paso"] = "variantes"
-        elif paso == "variantes":
-            mod["variantes"] = [v.strip() for v in texto.split(",") if v.strip()]
-            ses["paso"] = "fotos"
-            ses["chat_id"] = m["chat"]["id"]
-        guardar(ses)
-        acciones.append(preguntar(ses["paso"]))
-        return acciones
-
-
-def continuar(ses, nombre):
-    """Qué mostrar si tocan un botón viejo."""
-    if not ses:
-        return menu(nombre)
-    if ses["paso"] == "categoria":
-        return pedir_categoria()
-    if ses["paso"] == "linea":
-        return pedir_linea(buscar_categoria(ses["modelo"]["categoria"]))
-    return preguntar(ses["paso"])
-
-
-def terminar(uid, ses, guardar):
-    """Guarda el modelo como borrador con su código y sus fotos, y muestra la vista previa."""
-    mod = ses["modelo"]
-    cat = buscar_categoria(mod["categoria"])
-    fotos = mod.get("fotos_tmp", [])
-    portada = mod.get("portada", 0)
-    orden = [fotos[portada]] + [f for i, f in enumerate(fotos) if i != portada] if fotos else []
-    modelos = leer_json(MODELOS_FILE, [])
-    codigo = siguiente_codigo(modelos, cat["codigo"])
-    rutas = guardar_fotos_modelo(codigo, [DATA / f["archivo"] for f in orden]) if orden else []
-    nuevo = {
-        "codigo": codigo,
-        "categoria": mod["categoria"],
-        "linea": mod.get("linea"),
-        "nombre": mod["nombre"],
-        "descripcion": mod["descripcion"],
-        "precio": mod["precio"],
-        "variantes": mod.get("variantes", []),
-        "fotos": rutas,
-        "fotos_tg": [f["file_id"] for f in orden],
-        "video": None,
-        "estado": "borrador",
-        "creado": datetime.date.today().isoformat(),
-    }
-    modelos.append(nuevo)
-    escribir_json(MODELOS_FILE, modelos)
-    limpiar_tmp(uid)
-    guardar(None)
-    return [vista_previa(nuevo, orden[0]["file_id"] if orden else None), menu()]
+    import oli_gestion
+    try:
+        return oli_gestion.procesar(update, sys.modules[__name__])
+    except Exception:
+        registrar_error("gestion_modelo")
+        return [msg("No pude completar la operación. Conservé los datos anteriores; reabrí el menú para revisar.", [[{"texto": "Menú", "data": "menu"}]])]
 
 
 # ---------- envío a Telegram ----------
@@ -610,7 +395,11 @@ def enviar_acciones(chat_id, acciones):
             if a.get("texto"):
                 datos["text"] = a["texto"]
                 datos["show_alert"] = bool(a.get("alerta"))
-            telegram("answerCallbackQuery", datos)
+            try:
+                telegram("answerCallbackQuery", datos)
+            except Exception:
+                # Los botones caducan pronto; no perder la confirmación de una operación ya guardada.
+                registrar_error("respuesta_boton_caducada")
         elif a["tipo"] == "editar_botones":
             telegram("editMessageReplyMarkup", {"chat_id": chat_id, "message_id": a["message_id"],
                                                 "reply_markup": teclado(a["botones"])})
@@ -646,49 +435,8 @@ def chat_de(update):
 
 
 # ---------- servidor ----------
-class Handler(BaseHTTPRequestHandler):
-    def _json(self, code, obj):
-        body = json.dumps(obj, ensure_ascii=False).encode()
-        self.send_response(code)
-        self.send_header("Content-Type", "application/json; charset=utf-8")
-        self.send_header("Content-Length", str(len(body)))
-        self.end_headers()
-        self.wfile.write(body)
-
-    def _autorizado(self):
-        k = self.headers.get("X-Oli-Key", "")
-        return bool(API_KEY) and hmac.compare_digest(k, API_KEY)
-
-    def do_GET(self):
-        if self.path == "/api/salud":
-            return self._json(200, {"ok": True, "version": "publicar-v1"})
-        return self._json(404, {"error": "no encontrado"})
-
-    def do_POST(self):
-        if not self._autorizado():
-            return self._json(401, {"error": "no autorizado"})
-        if self.path != "/api/bot":
-            return self._json(404, {"error": "no encontrado"})
-        try:
-            n = int(self.headers.get("Content-Length", "0"))
-            body = json.loads(self.rfile.read(n) or b"{}")
-            update = body.get("update", body)
-            acciones = procesar(update)
-            if BOT_TOKEN and acciones:
-                enviar_acciones(chat_de(update), acciones)
-        except Exception as e:
-            print("Error procesando mensaje:", repr(e), file=sys.stderr, flush=True)
-            return self._json(500, {"error": "error interno"})
-        salida = [{k: v for k, v in a.items() if k != "bytes"} for a in acciones]
-        return self._json(200, {"acciones": salida, "enviado": bool(BOT_TOKEN)})
-
-    def log_message(self, fmt, *args):
-        print("oli-api:", fmt % args, flush=True)
-
+from oli_http import crear_handler
+Handler = crear_handler(sys.modules[__name__])
 
 if __name__ == "__main__":
-    if not API_KEY:
-        print("Aviso: falta OLI_API_KEY; el servicio va a rechazar todos los pedidos.", flush=True)
-    if not BOT_TOKEN:
-        print("Aviso: falta OLI_BOT_TOKEN; el servicio arma las respuestas pero no las manda a Telegram.", flush=True)
     ThreadingHTTPServer(("127.0.0.1", PORT), Handler).serve_forever()

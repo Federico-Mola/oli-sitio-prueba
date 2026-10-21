@@ -60,6 +60,15 @@ class AgentTests(unittest.TestCase):
         self.approved.write_text('{"codigos":[]}')
         self.assertEqual(self.catalog.search('moña')['productos'],[])
 
+    def test_aprobacion_telegram_es_explicita_y_ocultar_retira(self):
+        self.rows[2]['aprobado_comercialmente']=True
+        self.rows[0]['aprobado_comercialmente']=False
+        self.models.write_text(json.dumps(self.rows),encoding='utf-8')
+        self.assertEqual([p['codigo'] for p in self.catalog.search('moña')['productos']],['ACC-9002'])
+        self.rows[2]['estado']='oculto'
+        self.models.write_text(json.dumps(self.rows),encoding='utf-8')
+        self.assertEqual(self.catalog.search('moña')['productos'],[])
+
     def test_corrupt_and_missing_catalog_not_silently_empty(self):
         self.models.write_text('broken')
         self.assertEqual(self.catalog.search('moña')['estado'],'no_disponible')

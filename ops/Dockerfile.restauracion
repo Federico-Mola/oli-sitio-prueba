@@ -1,0 +1,15 @@
+# Compilar desde la raíz oli/ de un respaldo descifrado, no desde el repositorio.
+# Reutiliza los recursos optimizados guardados; no depende del CDN del diseño.
+FROM nginx:stable-alpine
+RUN apk add --no-cache python3 py3-pillow ffmpeg
+COPY publica /usr/share/nginx/html
+COPY fuente/nginx.conf /etc/nginx/conf.d/default.conf
+COPY fuente/oli-agent-proxy.conf /etc/nginx/oli-agent-proxy.conf
+COPY fuente/build.py fuente/webflow.css fuente/oli_api.py fuente/oli_publicacion.py fuente/oli_eventos.py fuente/oli_gestion.py fuente/oli_http.py fuente/oli_media.py fuente/oli_upload.py /app/
+COPY fuente/data /app/data
+COPY fuente/carga-web /app/carga-web
+COPY fuente/40-oli-build.sh /docker-entrypoint.d/40-oli-build.sh
+COPY fuente/45-oli-api.sh /docker-entrypoint.d/45-oli-api.sh
+RUN chmod +x /docker-entrypoint.d/40-oli-build.sh /docker-entrypoint.d/45-oli-api.sh
+ENV SITE_DIR=/usr/share/nginx/html MODELOS_FILE=/data/modelos.json DATA_DIR=/data
+EXPOSE 80

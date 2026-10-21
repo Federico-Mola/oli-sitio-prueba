@@ -4,17 +4,19 @@ WORKDIR /build
 RUN pip install --no-cache-dir pillow fonttools brotli
 COPY build.py optimize.py ./
 COPY data ./data
+COPY carga-web ./carga-web
 ADD https://cdn.prod.website-files.com/6a90d29afcc3908981f2b9b4/css/oli-sitio.webflow.shared.af3c6f3e2.css webflow.css
 RUN python build.py && python optimize.py site
 
 # Etapa 2: nginx + python para regenerar las páginas con los modelos guardados en /data
-FROM nginx:1.27-alpine
-RUN apk add --no-cache python3 py3-pillow
+FROM nginx:stable-alpine
+RUN apk add --no-cache python3 py3-pillow ffmpeg
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY oli-agent-proxy.conf /etc/nginx/oli-agent-proxy.conf
 COPY --from=build /build/site /usr/share/nginx/html
 COPY --from=build /build/build.py /build/webflow.css /app/
-COPY oli_api.py oli_publicacion.py /app/
+COPY oli_api.py oli_publicacion.py oli_eventos.py oli_gestion.py oli_http.py oli_media.py oli_upload.py /app/
+COPY carga-web /app/carga-web
 COPY data /app/data
 COPY 40-oli-build.sh /docker-entrypoint.d/40-oli-build.sh
 COPY 45-oli-api.sh /docker-entrypoint.d/45-oli-api.sh

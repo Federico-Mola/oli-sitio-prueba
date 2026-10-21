@@ -1,0 +1,9 @@
+[Unit]
+Description=Comprobar tienda y continuidad Oli
+After=network-online.target docker.service
+[Service]
+Type=oneshot
+UMask=0077
+ExecStart=/usr/bin/python3 /opt/oli-operacion/oli_operacion.py monitor
+TimeoutStartSec=150
+Nice=10

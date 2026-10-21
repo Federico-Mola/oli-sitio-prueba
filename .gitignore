@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+site/
+webflow.css
+assets.txt
+actualizar_base.py
+.env
+*.env
+*.pem
+*.olibak
+provider.json

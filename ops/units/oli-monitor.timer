@@ -1,0 +1,8 @@
+[Unit]
+Description=Comprobar servicios Oli cada cinco minutos
+[Timer]
+OnBootSec=4min
+OnUnitActiveSec=5min
+Unit=oli-monitor.service
+[Install]
+WantedBy=timers.target

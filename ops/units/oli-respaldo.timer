@@ -1,0 +1,9 @@
+[Unit]
+Description=Respaldo diario Oli a las 03:10 de Uruguay
+[Timer]
+OnCalendar=*-*-* 06:10:00 UTC
+RandomizedDelaySec=600
+Persistent=true
+Unit=oli-respaldo.service
+[Install]
+WantedBy=timers.target

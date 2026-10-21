@@ -345,6 +345,9 @@ for m in MODELOS:
     gal = (f'<div><div class="oli-mp-gallery">{slides}</div>'
            + (f'<div class="oli-mp-thumbs">{thumbs}</div><p class="oli-mp-hint oli-only-phone">Deslizá para ver las {len(fotos)} fotos</p>' if thumbs else "")
            + '</div>') if fotos else "<div></div>"
+    video = m.get("video")
+    if isinstance(video,str) and video.startswith('/media/modelos/'+m['codigo']+'/') and (MODELOS_FILE.parent/video.lstrip('/')).is_file():
+        gal += '<video controls playsinline preload="metadata" style="width:100%;max-height:600px" src="'+_html.escape(video,quote=True)+'" aria-label="Video del modelo"></video>'
     vars_ = "".join(f'<span class="oli-model-var">{_html.escape(v)}</span>' for v in m.get("variantes") or [])
     body = (f'<section class="oli-mp-section"><div class="oli-mp-wrap">'
             f'<p class="oli-mp-crumbs"><a href="/{c["slug"]}">{c["nombre"]}</a>' + (f' › <a href="{volver}">{donde}</a>' if l else "") + '</p>'
@@ -356,13 +359,18 @@ for m in MODELOS:
             f'<p class="oli-wholesale-note">Precios por mayor: a acordar con Euge por <a href="{WA}">WhatsApp</a></p>'
             f'<a href="{volver}#modelos" class="oli-mp-back">← Ver más {donde}</a></div></div></section>')
     og_img = f"/media/modelos/{m['codigo']}/og.jpg" if (MEDIA_DIR / "modelos" / m["codigo"] / "og.jpg").exists() else (fotos[0] if fotos else "/img/oli-logo.webp")
+    social=m.get('imagen_social')
+    if isinstance(social,str) and social.startswith('/media/modelos/'+m['codigo']+'/') and (MODELOS_FILE.parent/social.lstrip('/')).is_file():og_img=social
     desc = m["descripcion"][:180]
     head = (f'<meta property="og:type" content="website"><meta property="og:site_name" content="La tiendita de Oli">'
             f'<meta property="og:title" content="{nombre} | La tiendita de Oli"><meta property="og:description" content="{_html.escape(desc)}">'
             f'<meta property="og:image" content="{SITE_URL}{og_img}"><meta property="og:url" content="{SITE_URL}{url}">'
             f'<meta name="twitter:card" content="summary_large_image">'
             + (f'<link rel="preload" href="{fotos[0]}" as="image" fetchpriority="high">' if fotos else ""))
-    pages.append(write(url, page(f'{m["nombre"]} | {donde} | La tiendita de Oli', desc, volver, body, head)))
+    pages.append(write(url, page(f'{m["nombre"]} | {donde} | La tiendita de Oli', desc, url, body, head)))
+    for anterior in m.get('rutas_anteriores',[]):
+        if isinstance(anterior,str) and _re.fullmatch('/modelos/'+m['codigo'].lower()+r'-[a-z0-9-]+',anterior) and anterior!=url:
+            write(anterior,'<!doctype html><html lang="es"><head><meta charset="utf-8"><meta http-equiv="refresh" content="0;url='+url+'"><link rel="canonical" href="'+SITE_URL+url+'"></head><body><a href="'+url+'">Ver modelo</a></body></html>')
 
 # --- Legales ---
 def md_to_html(md):
@@ -393,3 +401,6 @@ for f in sorted((ROOT / "data" / "legal").glob("*.md")):
 
 (SITE / "sitemap.txt").write_text("".join(p + "\n" for p in pages))
 print(f"OK: {len(pages)} páginas, {len(assets)} assets, css {len(css)//1024} KB")
+
+# Página privada para archivos que exceden la descarga de Telegram.
+if (ROOT/'carga-web').is_dir():shutil.copytree(ROOT/'carga-web',SITE/'carga-oli',dirs_exist_ok=True)
