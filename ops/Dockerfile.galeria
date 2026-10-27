@@ -1,0 +1,4 @@
+# Cambio de presentación: reutilizar los recursos y dependencias ya desplegados.
+# Para una construcción completa e independiente usar el Dockerfile de la raíz.
+FROM oli-sitio-prueba:gestion-v2.1
+COPY build.py /app/build.py

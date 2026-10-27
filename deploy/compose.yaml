@@ -56,7 +56,7 @@
       }
     },
     "sitio": {
-      "image": "oli-sitio-prueba:gestion-v2.1",
+      "image": "oli-sitio-prueba:galeria-v1",
       "container_name": "oli-sitio-prueba",
       "restart": "unless-stopped",
       "ports": [

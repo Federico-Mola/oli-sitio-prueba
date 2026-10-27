@@ -96,12 +96,22 @@ css += """
 .oli-mp-wrap{max-width:1100px;margin:0 auto;padding:0 32px;display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:40px;align-items:start}
 .oli-mp-crumbs{grid-column:1/-1;font-size:.85rem;color:#766c5f;margin:0}
 .oli-mp-crumbs a{color:#766c5f;text-decoration:none;border-bottom:1px solid rgba(118,108,95,.35)}
-.oli-mp-gallery{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;border-radius:18px;background:#f3e7d3;scrollbar-width:none}
+.oli-mp-photos{min-width:0}
+.oli-mp-gallery-shell{position:relative;min-width:0}
+.oli-mp-gallery{display:flex;width:100%;min-width:0;overflow-x:auto;scroll-snap-type:x mandatory;overscroll-behavior-x:contain;border-radius:18px;background:#f3e7d3;scrollbar-width:none;-webkit-overflow-scrolling:touch}
 .oli-mp-gallery::-webkit-scrollbar{display:none}
-.oli-mp-gallery img{flex:0 0 100%;width:100%;height:auto;aspect-ratio:1/1;object-fit:contain;scroll-snap-align:start;display:block;background:#f3e7d3}
+.oli-mp-gallery img{flex:0 0 100%;min-width:0;width:100%;height:auto;aspect-ratio:1/1;object-fit:contain;scroll-snap-align:start;scroll-snap-stop:always;display:block;background:#f3e7d3;user-select:none;-webkit-user-drag:none}
+.oli-mp-gallery:focus-visible,.oli-mp-arrow:focus-visible{outline:3px solid #80562b;outline-offset:3px}
+.oli-mp-gallery[data-many]{cursor:grab}
+.oli-mp-gallery.is-dragging{cursor:grabbing;scroll-snap-type:none}
+.oli-mp-arrow{position:absolute;top:50%;transform:translateY(-50%);width:44px;height:44px;padding:0;border:1px solid #d9c8b5;border-radius:50%;background:rgba(255,255,255,.92);color:#453f38;font-size:30px;line-height:1;cursor:pointer;box-shadow:0 2px 8px #0002}
+.oli-mp-arrow.prev{left:10px}.oli-mp-arrow.next{right:10px}
+.oli-mp-arrow:disabled{opacity:.35;cursor:default}
+.oli-mp-count{position:absolute;bottom:12px;left:50%;transform:translateX(-50%);padding:4px 12px;border-radius:20px;background:rgba(255,255,255,.92);color:#453f38;font-size:.8rem;pointer-events:none}
+.oli-mp-gallery-shell:not([data-ready]) .oli-mp-arrow,.oli-mp-gallery-shell:not([data-ready]) .oli-mp-count{display:none}
 .oli-mp-thumbs{display:flex;gap:8px;margin-top:10px;overflow-x:auto;scrollbar-width:none}
 .oli-mp-thumbs a{flex:0 0 64px;height:64px;border-radius:10px;overflow:hidden;border:2px solid transparent}
-.oli-mp-thumbs a:focus,.oli-mp-thumbs a:hover{border-color:#c97c79}
+.oli-mp-thumbs a:focus,.oli-mp-thumbs a:hover,.oli-mp-thumbs a[aria-current=true]{border-color:#c97c79}
 .oli-mp-thumbs img{width:100%;height:100%;object-fit:cover;display:block}
 .oli-mp-hint{font-size:.8rem;color:#766c5f;margin:6px 0 0}
 .oli-mp-info{display:flex;flex-direction:column;gap:14px}
@@ -189,6 +199,33 @@ SCRIPTS = """<script>
   if(v&&'IntersectionObserver' in window){
     new IntersectionObserver(function(es,o){es.forEach(function(e){if(e.isIntersecting){v.src=v.dataset.src;v.play&&v.play().catch(function(){});o.disconnect();}});},{rootMargin:'200px'}).observe(v);
   } else if(v){v.src=v.dataset.src;}
+  document.querySelectorAll('.oli-mp-photos').forEach(function(photos){
+    var gallery=photos.querySelector('.oli-mp-gallery'),shell=photos.querySelector('.oli-mp-gallery-shell');
+    var slides=Array.from(gallery.querySelectorAll('img')),thumbs=Array.from(photos.querySelectorAll('.oli-mp-thumbs a'));
+    if(slides.length<2)return;
+    var prev=photos.querySelector('.oli-mp-arrow.prev'),next=photos.querySelector('.oli-mp-arrow.next'),count=photos.querySelector('.oli-mp-count');
+    var index=0,drag=null,timer,reduce=window.matchMedia('(prefers-reduced-motion: reduce)');
+    function show(){
+      prev.disabled=index===0;next.disabled=index===slides.length-1;
+      count.textContent=(index+1)+' / '+slides.length;
+      thumbs.forEach(function(t,i){if(i===index)t.setAttribute('aria-current','true');else t.removeAttribute('aria-current');});
+      var active=thumbs[index],strip=photos.querySelector('.oli-mp-thumbs');
+      if(active&&strip){var left=active.offsetLeft-strip.offsetLeft;if(left<strip.scrollLeft||left+active.offsetWidth>strip.scrollLeft+strip.clientWidth)strip.scrollLeft=left-(strip.clientWidth-active.offsetWidth)/2;}
+    }
+    function go(i,instant){index=Math.max(0,Math.min(slides.length-1,i));gallery.scrollTo({left:index*gallery.clientWidth,behavior:instant||reduce.matches?'instant':'smooth'});show();}
+    prev.addEventListener('click',function(){go(index-1);});next.addEventListener('click',function(){go(index+1);});
+    thumbs.forEach(function(t,i){t.addEventListener('click',function(e){e.preventDefault();go(i);});});
+    gallery.addEventListener('scroll',function(){clearTimeout(timer);timer=setTimeout(function(){if(!drag&&gallery.clientWidth){index=Math.round(gallery.scrollLeft/gallery.clientWidth);show();}},100);},{passive:true});
+    gallery.addEventListener('keydown',function(e){if(e.target!==gallery)return;var i={ArrowLeft:index-1,ArrowRight:index+1,Home:0,End:slides.length-1}[e.key];if(i!==undefined){e.preventDefault();go(i);}});
+    // El tacto usa el desplazamiento nativo: mantiene scroll vertical y zoom con dos dedos.
+    gallery.addEventListener('pointerdown',function(e){if(e.pointerType!=='mouse'||e.button!==0)return;drag={id:e.pointerId,x:e.clientX,left:gallery.scrollLeft};gallery.classList.add('is-dragging');gallery.setPointerCapture(e.pointerId);gallery.focus({preventScroll:true});e.preventDefault();});
+    gallery.addEventListener('pointermove',function(e){if(drag&&e.pointerId===drag.id)gallery.scrollLeft=drag.left+drag.x-e.clientX;});
+    function finish(e){if(!drag||e.pointerId!==drag.id)return;drag=null;gallery.classList.remove('is-dragging');go(Math.round(gallery.scrollLeft/gallery.clientWidth));}
+    gallery.addEventListener('pointerup',finish);gallery.addEventListener('pointercancel',finish);gallery.addEventListener('lostpointercapture',finish);
+    if(window.ResizeObserver)new ResizeObserver(function(){if(!drag)go(index,true);}).observe(gallery);
+    else window.addEventListener('resize',function(){go(index,true);});
+    shell.setAttribute('data-ready','');show();
+  });
 })();
 </script>
 <script src="/oli-asistente/embed.js?v=20261021" defer></script>"""
@@ -338,12 +375,16 @@ for m in MODELOS:
     fotos = m.get("fotos") or []
     url = modelo_url(m)
     lazy = ' loading="lazy"'
-    slides = "".join(f'<img id="foto-{i}" src="{f}" alt="{nombre} — foto {i}" width="800" height="800"{"" if i == 1 else lazy}>'
+    slides = "".join(f'<img id="foto-{i}" src="{f}" alt="{nombre} — foto {i}" draggable="false" width="800" height="800"{"" if i == 1 else lazy}>'
                      for i, f in enumerate(fotos, 1))
     thumbs = "".join(f'<a href="#foto-{i}" aria-label="Ver foto {i}"><img src="{foto_chica(f)}" alt="" width="64" height="64" loading="lazy"></a>'
                      for i, f in enumerate(fotos, 1)) if len(fotos) > 1 else ""
-    gal = (f'<div><div class="oli-mp-gallery">{slides}</div>'
-           + (f'<div class="oli-mp-thumbs">{thumbs}</div><p class="oli-mp-hint oli-only-phone">Deslizá para ver las {len(fotos)} fotos</p>' if thumbs else "")
+    controls = ('<button class="oli-mp-arrow prev" type="button" aria-label="Foto anterior" aria-controls="fotos-modelo">&#8249;</button>'
+                '<button class="oli-mp-arrow next" type="button" aria-label="Foto siguiente" aria-controls="fotos-modelo">&#8250;</button>'
+                f'<span class="oli-mp-count" aria-live="polite" aria-atomic="true">1 / {len(fotos)}</span>') if thumbs else ''
+    gallery_access = f' role="region" aria-label="Fotos de {nombre}"' + (' tabindex="0" data-many=""' if thumbs else '')
+    gal = (f'<div class="oli-mp-photos"><div class="oli-mp-gallery-shell"><div id="fotos-modelo" class="oli-mp-gallery"{gallery_access}>{slides}</div>{controls}</div>'
+           + (f'<div class="oli-mp-thumbs">{thumbs}</div><p class="oli-mp-hint">Deslizá sobre la foto para ver más</p>' if thumbs else "")
            + '</div>') if fotos else "<div></div>"
     video = m.get("video")
     if isinstance(video,str) and video.startswith('/media/modelos/'+m['codigo']+'/') and (MODELOS_FILE.parent/video.lstrip('/')).is_file():
