@@ -16,6 +16,7 @@ igual a la variable de entorno OLI_API_KEY. Sin esa variable, el servicio rechaz
 import datetime
 import fcntl
 import hmac
+import http.client
 import io
 import json
 import math
@@ -26,7 +27,9 @@ import shutil
 import sys
 import threading
 import time
+import ssl
 import urllib.request
+import urllib.error
 import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from oli_publicacion import PublicacionError, publicar, escribir_json, SITE_URL, ruta_modelo
@@ -227,6 +230,14 @@ def borradores(pagina=0):
 
 
 # ---------- fotos ----------
+class DescargaTelegramError(Exception):
+    """Texto seguro para el usuario: nunca propagar URLs con el token del bot."""
+    def __init__(self, texto, codigo, grande=False):
+        super().__init__(texto)
+        self.codigo = codigo
+        self.grande = grande
+
+
 def foto_de_mensaje(m):
     """Devuelve (file_id, tipo) de lo que mandaron: 'foto', 'video', 'otro' o None si es texto."""
     if m.get("photo"):
@@ -246,12 +257,51 @@ def foto_de_mensaje(m):
 
 
 def descargar_de_telegram(file_id, destino):
-    info = telegram("getFile", {"file_id": file_id})
-    ruta = info["result"]["file_path"]
-    with urllib.request.urlopen(f"{TELEGRAM_URL}/file/bot{BOT_TOKEN}/{ruta}", timeout=60) as r:
-        datos = r.read(20 * 1024 * 1024 + 1)
-    if len(datos) > 20 * 1024 * 1024:
-        raise ValueError("Archivo demasiado grande; usar enlace de subida")
+    # Solo estas consultas/descargas son repetibles; nunca reintentar envíos a un chat.
+    limite = time.monotonic() + 26
+    datos = None
+    for intento in range(3):
+        restante = limite - time.monotonic()
+        if restante <= 0:
+            break
+        espera = min(.5 * (2 ** intento), restante)
+        try:
+            info = telegram("getFile", {"file_id": file_id}, timeout=min(7, restante))
+            ruta = info.get("result", {}).get("file_path")
+            if not info.get("ok") or not isinstance(ruta, str) or not ruta:
+                raise DescargaTelegramError('Telegram no dejó disponible esa foto. Reenviála o usá Subir por la web.', 'archivo_telegram_no_disponible')
+            restante = limite - time.monotonic()
+            if restante <= 0:
+                break
+            with urllib.request.urlopen(f"{TELEGRAM_URL}/file/bot{BOT_TOKEN}/{ruta}", timeout=min(10, restante)) as r:
+                datos = r.read(20 * 1024 * 1024 + 1)
+            if len(datos) > 20 * 1024 * 1024:
+                raise DescargaTelegramError('Este archivo supera la descarga de Telegram. Usá Subir por la web.', 'archivo_telegram_grande', grande=True)
+            if not datos:
+                raise http.client.IncompleteRead(b'')
+            break
+        except urllib.error.HTTPError as error:
+            try:
+                body = json.loads(error.read(65536))
+            except Exception:
+                body = {}
+            description = str(body.get('description', '')).casefold()
+            if error.code == 400 and ('file is too big' in description or 'file is too large' in description):
+                raise DescargaTelegramError('Este archivo necesita Subir por la web.', 'archivo_telegram_grande', grande=True) from None
+            if error.code not in (408, 429) and error.code < 500:
+                raise DescargaTelegramError('No pude acceder a esa foto en Telegram. Reenviála o usá Subir por la web; tu avance está guardado.', 'archivo_telegram_no_disponible') from None
+            try:
+                espera = max(espera, float(body.get('parameters', {}).get('retry_after', 0)))
+            except (TypeError, ValueError):
+                pass
+        except (urllib.error.URLError, TimeoutError, ConnectionError, ssl.SSLError, http.client.HTTPException):
+            pass
+        if intento < 2 and espera < limite - time.monotonic():
+            time.sleep(espera)
+        else:
+            break
+    if datos is None or not datos:
+        raise DescargaTelegramError('Telegram demoró o interrumpió la descarga. Volvé a enviar la foto o el álbum; las fotos recibidas y tu avance están guardados. También podés usar Subir por la web.', 'descarga_telegram_temporal') from None
     destino.parent.mkdir(parents=True, exist_ok=True)
     destino.write_bytes(datos)
 
@@ -359,11 +409,11 @@ def procesar(update):
 
 
 # ---------- envío a Telegram ----------
-def telegram(metodo, datos):
+def telegram(metodo, datos, timeout=30):
     req = urllib.request.Request(
         f"{TELEGRAM_URL}/bot{BOT_TOKEN}/{metodo}",
         data=json.dumps(datos).encode(), headers={"Content-Type": "application/json"})
-    with urllib.request.urlopen(req, timeout=30) as r:
+    with urllib.request.urlopen(req, timeout=timeout) as r:
         return json.loads(r.read())
 
 

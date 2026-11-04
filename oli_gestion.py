@@ -156,14 +156,40 @@ def recibir_media(a,uid,message,target):
     if obj.get('file_size',0)>19*1024*1024:
         return 'grande'
     if not obj.get('file_id'):raise MediaError('No pude identificar el archivo. Usá Subir por la web.')
+    def propia(entry):
+        path=(a.DATA/entry.get('archivo','')).resolve()
+        return path if path.is_relative_to(a.MEDIA.resolve()) and path.is_file() else None
+    if target.get('reemplazar') is None:
+        for entry in target.get('fotos_tmp',[]):
+            if (entry.get('file_id')==obj['file_id'] or (obj.get('file_unique_id') and entry.get('file_unique_id')==obj['file_unique_id'])) and propia(entry):
+                return 'foto'
     dest=a.MEDIA/'tmp'/uid/'archivos'/(uuid.uuid4().hex+'.bin')
     try:
         a.descargar_de_telegram(obj['file_id'],dest)
-        kind=validar_archivo(dest)
+    except a.DescargaTelegramError as error:
+        dest.unlink(missing_ok=True)
+        a.registrar_error(error.codigo)
+        if error.grande:return 'grande'
+        raise MediaError(str(error)) from None
     except Exception:
         dest.unlink(missing_ok=True)
-        raise MediaError('No pude recibir ese archivo. Probá JPG/PNG/WebP, MP4/MOV/WebM o Subir por la web.') from None
-    entry={'archivo':dest.relative_to(a.DATA).as_posix(),'file_id':obj['file_id'],'msg':message.get('message_id',0)}
+        a.registrar_error('guardar_archivo_telegram')
+        raise MediaError('No pude guardar esa foto. Conservé tu avance; probá otra vez o usá Subir por la web.') from None
+    try:
+        kind=validar_archivo(dest)
+    except MediaError:
+        dest.unlink(missing_ok=True)
+        a.registrar_error('formato_archivo_telegram')
+        raise
+    digest=hashlib.sha256(dest.read_bytes()).hexdigest()
+    if kind=='foto' and target.get('reemplazar') is None:
+        for previous in target.get('fotos_tmp',[]):
+            path=propia(previous)
+            if path and hashlib.sha256(path.read_bytes()).hexdigest()==digest:
+                dest.unlink(missing_ok=True)
+                return 'foto'
+    entry={'archivo':dest.relative_to(a.DATA).as_posix(),'file_id':obj['file_id'],'msg':message.get('message_id',0),'sha256':digest}
+    if obj.get('file_unique_id'):entry['file_unique_id']=obj['file_unique_id']
     if kind=='foto':
         replace=target.pop('reemplazar',None)
         if replace is not None:

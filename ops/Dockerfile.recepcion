@@ -1,0 +1,4 @@
+# Parche de recepción sobre la versión que conserva la galería táctil.
+# El Dockerfile principal permite reconstruir todo desde cero con estas mismas fuentes.
+FROM oli-sitio-prueba:galeria-v1
+COPY oli_api.py oli_gestion.py /app/
