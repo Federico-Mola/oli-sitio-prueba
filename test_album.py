@@ -64,6 +64,17 @@ class AlbumTests(unittest.TestCase):
 
 
 class ContinuidadFotosTests(test_gestion.GestionTests):
+    def test_no_guarda_un_articulo_mientras_hay_fotos_en_cola(self):
+        self.cb('cargar');self.cb('cat:velas');self.cb('lin:velas-numero')
+        for text in ['Artículo único','Descripción del artículo','250','Sin variantes']:self.text(text)
+        token=gestion.comenzar_media('123')
+        try:
+            result=self.cb('fotos_listo')
+            self.assertIn('Todavía estoy recibiendo',str(result))
+            self.assertEqual(self.sessions()['paso'],'fotos')
+            self.assertEqual(self.catalogo_guardado(),self.models_original())
+        finally:gestion.terminar_media('123',token)
+
     def test_fotos_reanudan_carga_desde_menu_y_no_responden_por_imagen(self):
         self.cb('cargar');self.cb('cat:velas');self.cb('lin:velas-numero')
         for text in ['Artículo único','Descripción del artículo','250','Sin variantes']:self.text(text)

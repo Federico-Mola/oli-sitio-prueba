@@ -276,6 +276,10 @@ def procesar(update,a):
                 ses['foco']='carga';save()
             elif not ses.get('paso') and ses.get('edicion',{}).get('campo')=='media':
                 ses['foco']='edicion';save()
+        guardando=data in ('fotos_listo','ed_guardar') or (data.startswith('ok:') and ses.get('confirmacion',{}).get('accion')=='ed_guardar')
+        if guardando:
+            with _ALBUM_LOCK:pendiente=bool(_MEDIA_PENDIENTE.get(uid))
+            if pendiente:return actions+[a.msg('Todavía estoy recibiendo las fotos de este artículo. Esperá el resumen antes de guardar; tu avance se conserva.')]
         def model(code):
             return next((m for m in a.leer_json(a.MODELOS_FILE,[]) if m.get('codigo')==code),None)
         def cargar_nuevo():
