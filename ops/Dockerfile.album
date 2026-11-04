@@ -1,0 +1,3 @@
+# Conserva recepción, galería y recursos; reemplaza solo la agrupación de fotos.
+FROM oli-sitio-prueba:recepcion-v1
+COPY oli_gestion.py oli_eventos.py /app/

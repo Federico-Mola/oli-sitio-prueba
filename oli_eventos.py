@@ -25,6 +25,19 @@ def _decode(value):
 
 
 def ejecutar(api, update, enviar=True):
+    import oli_gestion
+    message=update.get('message') or {}
+    uid=str(message.get('from',{}).get('id',''))
+    token=None
+    if uid in api.USUARIOS_PERMITIDOS and any(message.get(k) for k in ('photo','video','document','animation')):
+        token=oli_gestion.comenzar_media(uid)
+    try:
+        return _ejecutar(api,update,enviar)
+    finally:
+        if token:oli_gestion.terminar_media(uid,token)
+
+
+def _ejecutar(api, update, enviar=True):
     obj=update.get('message') or update.get('callback_query') or {}
     uid=str(obj.get('from',{}).get('id',''))
     if not api.USUARIOS_PERMITIDOS or uid not in api.USUARIOS_PERMITIDOS:

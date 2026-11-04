@@ -14,26 +14,71 @@ import oli_upload
 
 _ALBUMS={}
 _ALBUM_LOCK=threading.Lock()
+_MEDIA_PENDIENTE={}
+_MEDIA_ACTIVIDAD={}
 
 
-def resumen_album(a,uid,chat_id,modo):
+def comenzar_media(uid):
+    """Registrar la llegada antes de esperar el bloqueo de procesamiento."""
+    token=uuid.uuid4().hex
+    with _ALBUM_LOCK:
+        _MEDIA_PENDIENTE.setdefault(uid,set()).add(token)
+        _MEDIA_ACTIVIDAD[uid]=time.monotonic()
+    return token
+
+
+def terminar_media(uid,token):
+    with _ALBUM_LOCK:
+        pending=_MEDIA_PENDIENTE.get(uid,set());pending.discard(token)
+        if not pending:_MEDIA_PENDIENTE.pop(uid,None)
+        _MEDIA_ACTIVIDAD[uid]=time.monotonic()
+
+
+def resumen_album(a,uid,chat_id,modo,generacion=None):
     """Agrupa la previsualización; los archivos ya están persistidos antes de esperar."""
+    if not a.BOT_TOKEN:return
     nonce=uuid.uuid4().hex
-    with _ALBUM_LOCK:_ALBUMS[uid]=nonce
+    with _ALBUM_LOCK:
+        _ALBUMS[uid]=nonce
+        _MEDIA_ACTIVIDAD[uid]=time.monotonic()
     def worker():
-        time.sleep(a.ESPERA_ALBUM)
-        with _ALBUM_LOCK:
-            if _ALBUMS.get(uid)!=nonce:return
-            _ALBUMS.pop(uid,None)
         try:
-            with a.Bloqueo():
-                ses=a.leer_json(a.SESIONES_FILE,{}).get(uid,{})
-                if ses.get('foco')!=modo:return
-                if modo=='edicion' and ses.get('edicion',{}).get('campo')=='media':result=editar_fotos(a,copy.deepcopy(ses['edicion']))
-                elif modo=='carga' and ses.get('paso')=='fotos':result=pregunta(a,ses)
-                else:return
-            if a.BOT_TOKEN:a.enviar_acciones(chat_id,[result])
+            import oli_eventos
+            limite=time.monotonic()+300
+            while time.monotonic()<limite:
+                with _ALBUM_LOCK:
+                    if _ALBUMS.get(uid)!=nonce:return
+                    busy=bool(_MEDIA_PENDIENTE.get(uid))
+                    quiet=time.monotonic()-_MEDIA_ACTIVIDAD.get(uid,0)
+                if busy or quiet<a.ESPERA_ALBUM:
+                    time.sleep(min(.25,a.ESPERA_ALBUM));continue
+                # Mismo orden de bloqueos que el receptor. Revalidar DESPUÉS de esperar.
+                with oli_eventos.LOCK:
+                    with a.Bloqueo():
+                        with _ALBUM_LOCK:
+                            if _ALBUMS.get(uid)!=nonce:return
+                            if _MEDIA_PENDIENTE.get(uid) or time.monotonic()-_MEDIA_ACTIVIDAD.get(uid,0)<a.ESPERA_ALBUM:continue
+                        ses=a.leer_json(a.SESIONES_FILE,{}).get(uid,{})
+                        if ses.get('foco')!=modo:return
+                        if modo=='edicion' and ses.get('edicion',{}).get('campo')=='media':
+                            edit=ses['edicion']
+                            if generacion and (edit.get('codigo'),edit.get('revision'))!=generacion:return
+                            result=editar_fotos(a,copy.deepcopy(edit))
+                        elif modo=='carga' and ses.get('paso')=='fotos':
+                            if generacion and ses.get('carga_id')!=generacion:return
+                            result=pregunta(a,ses)
+                        else:return
+                    with _ALBUM_LOCK:
+                        if _ALBUMS.get(uid)!=nonce:return
+                        if _MEDIA_PENDIENTE.get(uid):continue
+                    a.enviar_acciones(chat_id,[result])
+                    return
         except Exception:a.registrar_error('resumen_album')
+        finally:
+            with _ALBUM_LOCK:
+                if _ALBUMS.get(uid)==nonce:
+                    _ALBUMS.pop(uid,None)
+                    if not _MEDIA_PENDIENTE.get(uid):_MEDIA_ACTIVIDAD.pop(uid,None)
     threading.Thread(target=worker,daemon=True).start()
 
 
@@ -224,6 +269,13 @@ def procesar(update,a):
         def save():
             ses['actualizado']=datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='seconds')
             sessions[uid]=ses;a.escribir_json(a.SESIONES_FILE,sessions)
+        media=message and any(message.get(k) for k in ('photo','video','document','animation'))
+        # Una foto con una única carga pendiente retoma ese artículo aunque se haya abierto Menú.
+        if media and ses.get('foco')=='menu' and not ses.get('buscando') and not ses.get('confirmacion'):
+            if ses.get('paso')=='fotos' and not ses.get('edicion'):
+                ses['foco']='carga';save()
+            elif not ses.get('paso') and ses.get('edicion',{}).get('campo')=='media':
+                ses['foco']='edicion';save()
         def model(code):
             return next((m for m in a.leer_json(a.MODELOS_FILE,[]) if m.get('codigo')==code),None)
         def cargar_nuevo():
@@ -369,9 +421,8 @@ def procesar(update,a):
                     if kind=='grande':return actions+[subir('edicion')]
                     if not kind:return actions+[a.msg('Mandame fotos/video o elegí una opción de Fotos.')]
                     save()
-                    if message.get('media_group_id'):
-                        resumen_album(a,uid,chat.get('id',int(uid)),'edicion');return actions
-                    return actions+[editar_fotos(a,edit)]
+                    resumen_album(a,uid,chat.get('id',int(uid)),'edicion',(edit.get('codigo'),edit.get('revision')))
+                    return actions
                 if field=='orden':
                     order=[int(x.strip())-1 for x in text.split(',')]
                     if sorted(order)!=list(range(len(edit['fotos_tmp']))):raise PublicacionError('Incluí cada número de foto una sola vez.')
@@ -415,9 +466,8 @@ def procesar(update,a):
                 if kind=='grande':return actions+[subir('carga')]
                 if not kind:return actions+[pregunta(a,ses)]
                 save()
-                if message.get('media_group_id'):
-                    resumen_album(a,uid,chat.get('id',int(uid)),'carga');return actions
-                return actions+[pregunta(a,ses)]
+                resumen_album(a,uid,chat.get('id',int(uid)),'carga',ses.get('carga_id'))
+                return actions
             if ses.get('paso') in ('nombre','descripcion','precio','variantes') and message and ses.get('foco','carga')=='carga':
                 field=ses['paso'];ses['modelo'][field]=valid_texto(a,field,text)
                 ses['paso']={'nombre':'descripcion','descripcion':'precio','precio':'variantes','variantes':'fotos'}[field];save();return actions+[pregunta(a,ses)]
