@@ -21,6 +21,19 @@ def command(args,timeout=90):
 def now():return datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='seconds')
 
 
+def tomar_bloqueo(lock,modo,espera=180):
+    """El respaldo espera al monitor; un monitor solapado omite esta ronda."""
+    limite=time.monotonic()+espera
+    while True:
+        try:
+            fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
+            return True
+        except BlockingIOError:
+            if modo!='backup':return False
+            if time.monotonic()>=limite:raise TimeoutError('bloqueo_continuidad_ocupado')
+            time.sleep(min(0.25,max(0,limite-time.monotonic())))
+
+
 def sha256_file(path):
     h=hashlib.sha256()
     with path.open('rb') as f:
@@ -207,8 +220,10 @@ def monitor(test=False):
 if __name__=='__main__':
     os.umask(0o077);BASE.mkdir(mode=0o700,exist_ok=True)
     with open(BASE/'operacion.lock','a') as lock:
-        fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
         try:
+            if not tomar_bloqueo(lock,sys.argv[1]):
+                print('Monitor omitido: otra tarea de continuidad en curso')
+                sys.exit(0)
             if sys.argv[1]=='backup':backup()
             elif sys.argv[1]=='prueba-aviso':monitor(True)
             else:monitor()

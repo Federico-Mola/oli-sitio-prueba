@@ -33,10 +33,16 @@ with tempfile.TemporaryDirectory(prefix='restauracion-probada-',dir='/opt/oli-op
     for file in root.rglob('*.sqlite'):
         with sqlite3.connect('file:'+str(file)+'?mode=ro',uri=True) as db:assert db.execute('PRAGMA integrity_check').fetchone()[0]=='ok'
         dbs+=1
+    # Usar el código guardado en la copia y dependencias de una imagen local
+    # existente; una etiqueta histórica puede haber sido retirada del VPS.
+    image=subprocess.check_output(['docker','inspect','--format','{{.Image}}','oli-sitio-prueba'],text=True).strip()
+    if not image.startswith('sha256:'):raise RuntimeError('imagen_local_no_identificada')
     code="""import pathlib,shutil,subprocess,sys,json
-sys.path.insert(0,'/app')
+shutil.copytree('/fuente','/tmp/fuente')
+sys.path.insert(0,'/tmp/fuente')
 shutil.copytree('/restaurada','/tmp/restaurada')
-r=subprocess.run([sys.executable,'/app/build.py'],capture_output=True);assert r.returncode==0
+shutil.rmtree('/tmp/restaurada/modelos',ignore_errors=True)
+r=subprocess.run([sys.executable,'/tmp/fuente/build.py'],capture_output=True);assert r.returncode==0
 models=json.loads(pathlib.Path('/data/modelos.json').read_text())
 assert len(models)>0
 for m in models:
@@ -45,9 +51,9 @@ for m in models:
   assert (pathlib.Path('/tmp/restaurada')/p.ruta_modelo(m).lstrip('/')/'index.html').is_file()
 print('Sitio reconstruido desde respaldo sin red')
 """
-    cmd=['docker','run','--rm','--network','none','--memory','512m','--cpus','0.7','--mount','type=bind,src='+str(root/'datos')+',dst=/data,readonly','--mount','type=bind,src='+str(root/'publica')+',dst=/restaurada,readonly','-e','SITE_DIR=/tmp/restaurada','-e','SITE_URL=https://www.latienditadeoli.com','--entrypoint','python3','oli-sitio-prueba:gestion-v2','-c',code]
+    cmd=['docker','run','--rm','--pull','never','--network','none','--memory','512m','--cpus','0.7','--mount','type=bind,src='+str(root/'datos')+',dst=/data,readonly','--mount','type=bind,src='+str(root/'publica')+',dst=/restaurada,readonly','--mount','type=bind,src='+str(root/'fuente')+',dst=/fuente,readonly','-e','SITE_DIR=/tmp/restaurada','-e','SITE_URL=https://www.latienditadeoli.com','--entrypoint','python3',image,'-c',code]
     r=subprocess.run(cmd,capture_output=True,timeout=90)
     assert r.returncode==0,'La reconstrucción aislada no pasó'
-    report={'fecha':__import__('datetime').datetime.now(__import__('datetime').timezone.utc).isoformat(timespec='seconds'),'archivo':request['archivo'],'archivos':len(manifest['archivos']),'modelos':manifest['modelos'],'sqlite_integras':dbs,'sitio_reconstruido':True,'produccion_modificada':False}
+    report={'fecha':__import__('datetime').datetime.now(__import__('datetime').timezone.utc).isoformat(timespec='seconds'),'archivo':request['archivo'],'archivos':len(manifest['archivos']),'modelos':manifest['modelos'],'sqlite_integras':dbs,'sitio_reconstruido':True,'fuente_del_respaldo':True,'imagen_dependencias':image,'produccion_modificada':False}
     Path('/opt/oli-operacion/ultima-restauracion.json').write_text(json.dumps(report))
     print(json.dumps(report))
