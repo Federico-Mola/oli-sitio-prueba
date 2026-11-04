@@ -19,7 +19,13 @@ class GestionTests(test_publicacion.PublicacionTests):
     def text(self,t):
         return api.procesar({'message':{'from':{'id':123},'chat':{'id':123,'type':'private'},'message_id':99,'text':t}})
 
-    def cb(self,s):return api.procesar(self.callback(s))
+    def cb(self,s):
+        import oli_gestion as gestion
+        if gestion.accion_fotos(s) and '~' not in s:
+            ses=self.sessions();target=ses.get('edicion',{}) if s.startswith('ed_') else ses.get('modelo',{})
+            generacion=target.get('id') if s.startswith('ed_') else ses.get('carga_id')
+            s+='~'+gestion.firma_fotos(target,generacion)
+        return api.procesar(self.callback(s))
     def sessions(self):return json.loads(api.SESIONES_FILE.read_text())['123']
     def catalogo_guardado(self):return json.loads(self.file.read_text())
     def accept(self):return self.cb(self.sessions()['confirmacion']['token'].join(['ok:','']))

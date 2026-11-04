@@ -61,6 +61,9 @@ def manejar(handler,api,path):
         raise UploadError(403,'No se pudo validar la carga.')
     hashed,row=validar_token(api,handler.headers.get('X-Oli-Upload',''))
     if path=='/api/subida/finalizar':
+        import oli_gestion
+        with oli_gestion._ALBUM_LOCK:pendiente=bool(oli_gestion._MEDIA_PENDIENTE.get(row[0]))
+        if pendiente:raise UploadError(409,'Todavía hay archivos en recepción. Esperá y volvé a terminar la carga.')
         if int(handler.headers.get('Content-Length','0'))>64:raise UploadError(413,'Solicitud demasiado grande.')
         handler.rfile.read(int(handler.headers.get('Content-Length','0')))
         with api.Bloqueo():
@@ -80,9 +83,12 @@ def manejar(handler,api,path):
     if not 0<size<=MAX_ARCHIVO:raise UploadError(413,'Cada archivo debe pesar hasta 100 MB.')
     if row[4]>=11:raise UploadError(429,'Este enlace ya recibió el máximo de archivos.')
     if not SLOT.acquire(blocking=False):raise UploadError(429,'Se está procesando otro archivo. Reintentá en unos segundos.')
-    folder=api.MEDIA/'tmp'/row[0]/'subidas';folder.mkdir(parents=True,exist_ok=True)
+    folder=api.MEDIA/'tmp'/row[0]/'subidas'
     file=folder/(uuid.uuid4().hex+'.bin');retained=False
+    import oli_gestion
+    entrada=oli_gestion.comenzar_media(row[0])
     try:
+        folder.mkdir(parents=True,exist_ok=True)
         hashed,row=validar_token(api,handler.headers.get('X-Oli-Upload',''))
         remaining=size
         digest=hashlib.sha256()
@@ -97,14 +103,21 @@ def manejar(handler,api,path):
             ses=sessions.get(row[0],{});target=destino(ses,row)
             hashed,row=validar_token(api,handler.headers.get('X-Oli-Upload',''))
             sha=digest.hexdigest()
-            if any(e.get('sha256')==sha for e in target.get('fotos_tmp',[])+([target['video_tmp']] if target.get('video_tmp') else [])):
+            if target.get('reemplazar') is None and any(e.get('sha256')==sha for e in target.get('fotos_tmp',[])+([target['video_tmp']] if target.get('video_tmp') else [])):
                 return {'ok':True,'duplicado':True,'fotos':len(target.get('fotos_tmp',[])),'video':bool(target.get('video_tmp'))}
             entry={'archivo':file.relative_to(api.DATA).as_posix(),'file_id':None,'sha256':sha}
             if kind=='foto':
                 photos=target.setdefault('fotos_tmp',[])
-                if len(photos)>=10:raise UploadError(400,'El máximo es diez fotos. Quitá alguna antes de agregar otra.')
-                photos.append(entry)
-            else:target['video_tmp']=entry
+                replace=target.get('reemplazar')
+                if replace is not None:
+                    if not 0<=replace<len(photos):raise UploadError(409,'La foto cambió. Volvé a elegir cuál reemplazar.')
+                    photos[replace]=entry;target.pop('reemplazar',None)
+                else:
+                    if len(photos)>=10:raise UploadError(400,'El máximo es diez fotos. Quitá alguna antes de agregar otra.')
+                    photos.append(entry)
+            else:
+                if target.get('reemplazar') is not None:raise UploadError(400,'Para reemplazar una foto elegí una imagen.')
+                target['video_tmp']=entry
             target['media_cambiada']=True
             api.escribir_json(api.SESIONES_FILE,sessions);retained=True
             n=len(target.get('fotos_tmp',[]));has_video=bool(target.get('video_tmp'))
@@ -115,5 +128,8 @@ def manejar(handler,api,path):
         return {'ok':True,'tipo':kind,'fotos':n,'video':has_video}
     except MediaError as e:raise UploadError(400,str(e)) from None
     finally:
-        if not retained:file.unlink(missing_ok=True)
-        SLOT.release()
+        try:
+            if not retained:file.unlink(missing_ok=True)
+        finally:
+            SLOT.release()
+            oli_gestion.terminar_media(row[0],entrada)

@@ -46,6 +46,7 @@ PORT = int(os.environ.get("OLI_API_PORT", "8091"))
 BOT_TOKEN = os.environ.get("OLI_BOT_TOKEN", "")
 TELEGRAM_URL = os.environ.get("OLI_TELEGRAM_URL", "https://api.telegram.org")
 ESPERA_ALBUM = float(os.environ.get("OLI_ESPERA_ALBUM", "2.5"))  # segundos para juntar las fotos de un álbum
+DESCARGA_LOCAL = threading.local()
 USUARIOS_PERMITIDOS = {x.strip() for x in os.environ.get("OLI_ALLOWED_USER_IDS", "").split(",") if x.strip()}
 
 MAX_NOMBRE = 80
@@ -232,10 +233,11 @@ def borradores(pagina=0):
 # ---------- fotos ----------
 class DescargaTelegramError(Exception):
     """Texto seguro para el usuario: nunca propagar URLs con el token del bot."""
-    def __init__(self, texto, codigo, grande=False):
+    def __init__(self, texto, codigo, grande=False, detalle=None):
         super().__init__(texto)
         self.codigo = codigo
         self.grande = grande
+        self.detalle = detalle
 
 
 def foto_de_mensaje(m):
@@ -257,23 +259,32 @@ def foto_de_mensaje(m):
 
 
 def descargar_de_telegram(file_id, destino):
+    cache=getattr(DESCARGA_LOCAL,'valor',None)
+    if cache and cache['file_id']==file_id:
+        if cache.get('error'):raise cache['error']
+        destino.parent.mkdir(parents=True,exist_ok=True)
+        os.replace(cache['archivo'],destino)
+        return
     # Solo estas consultas/descargas son repetibles; nunca reintentar envíos a un chat.
-    limite = time.monotonic() + 26
+    limite = time.monotonic() + 65
     datos = None
+    detalle = None
     for intento in range(3):
         restante = limite - time.monotonic()
         if restante <= 0:
             break
         espera = min(.5 * (2 ** intento), restante)
         try:
-            info = telegram("getFile", {"file_id": file_id}, timeout=min(7, restante))
+            fase='consulta'
+            info = telegram("getFile", {"file_id": file_id}, timeout=min(20, restante))
             ruta = info.get("result", {}).get("file_path")
             if not info.get("ok") or not isinstance(ruta, str) or not ruta:
                 raise DescargaTelegramError('Telegram no dejó disponible esa foto. Reenviála o usá Subir por la web.', 'archivo_telegram_no_disponible')
             restante = limite - time.monotonic()
             if restante <= 0:
                 break
-            with urllib.request.urlopen(f"{TELEGRAM_URL}/file/bot{BOT_TOKEN}/{ruta}", timeout=min(10, restante)) as r:
+            fase='transferencia'
+            with urllib.request.urlopen(f"{TELEGRAM_URL}/file/bot{BOT_TOKEN}/{ruta}", timeout=min(20, restante)) as r:
                 datos = r.read(20 * 1024 * 1024 + 1)
             if len(datos) > 20 * 1024 * 1024:
                 raise DescargaTelegramError('Este archivo supera la descarga de Telegram. Usá Subir por la web.', 'archivo_telegram_grande', grande=True)
@@ -281,6 +292,7 @@ def descargar_de_telegram(file_id, destino):
                 raise http.client.IncompleteRead(b'')
             break
         except urllib.error.HTTPError as error:
+            detalle={'fase':fase,'tipo':'HTTPError','http':error.code}
             try:
                 body = json.loads(error.read(65536))
             except Exception:
@@ -289,19 +301,19 @@ def descargar_de_telegram(file_id, destino):
             if error.code == 400 and ('file is too big' in description or 'file is too large' in description):
                 raise DescargaTelegramError('Este archivo necesita Subir por la web.', 'archivo_telegram_grande', grande=True) from None
             if error.code not in (408, 429) and error.code < 500:
-                raise DescargaTelegramError('No pude acceder a esa foto en Telegram. Reenviála o usá Subir por la web; tu avance está guardado.', 'archivo_telegram_no_disponible') from None
+                raise DescargaTelegramError('No pude acceder a esa foto en Telegram. Reenviála o usá Subir por la web; tu avance está guardado.', 'archivo_telegram_no_disponible',detalle=detalle) from None
             try:
                 espera = max(espera, float(body.get('parameters', {}).get('retry_after', 0)))
             except (TypeError, ValueError):
                 pass
-        except (urllib.error.URLError, TimeoutError, ConnectionError, ssl.SSLError, http.client.HTTPException):
-            pass
+        except (urllib.error.URLError, TimeoutError, ConnectionError, ssl.SSLError, http.client.HTTPException) as error:
+            detalle={'fase':fase,'tipo':type(getattr(error,'reason',error)).__name__}
         if intento < 2 and espera < limite - time.monotonic():
             time.sleep(espera)
         else:
             break
     if datos is None or not datos:
-        raise DescargaTelegramError('Telegram demoró o interrumpió la descarga. Volvé a enviar la foto o el álbum; las fotos recibidas y tu avance están guardados. También podés usar Subir por la web.', 'descarga_telegram_temporal') from None
+        raise DescargaTelegramError('Telegram demoró o interrumpió la descarga. Volvé a enviar la foto o el álbum; las fotos recibidas y tu avance están guardados. También podés usar Subir por la web.', 'descarga_telegram_temporal',detalle=detalle) from None
     destino.parent.mkdir(parents=True, exist_ok=True)
     destino.write_bytes(datos)
 
@@ -390,12 +402,17 @@ def resumen_fotos(uid, token):
 _ERROR_LOCK = threading.Lock()
 
 
-def registrar_error(codigo):
+def registrar_error(codigo,detalle=None):
     codigo = codigo if re.fullmatch(r"[a-z0-9_]{1,64}", codigo) else "error_interno"
     with _ERROR_LOCK:
         folder = DATA / "operacion"
         folder.mkdir(parents=True, exist_ok=True)
-        escribir_json(folder / "ultimo-error.json", {"codigo": codigo, "fecha": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds")})
+        record={"codigo": codigo, "fecha": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds")}
+        if isinstance(detalle,dict):
+            if detalle.get('fase') in ('consulta','transferencia'):record['fase']=detalle['fase']
+            if re.fullmatch(r'[A-Za-z0-9_]{1,40}',str(detalle.get('tipo',''))):record['tipo']=detalle['tipo']
+            if type(detalle.get('http')) is int and 100<=detalle['http']<=599:record['http']=detalle['http']
+        escribir_json(folder / "ultimo-error.json", record)
     print("oli-error:", codigo, file=sys.stderr, flush=True)
 
 

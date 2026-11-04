@@ -85,6 +85,29 @@ def resumen_album(a,uid,chat_id,modo,generacion=None):
 def boton(texto,data):return {'texto':texto,'data':data}
 
 
+def firma_fotos(target,generacion):
+    value={'id':generacion,'fotos':target.get('fotos_tmp',[]),'video':target.get('video_tmp'),'portada':target.get('portada',0),'reemplazar':target.get('reemplazar')}
+    return hashlib.sha256(json.dumps(value,sort_keys=True,ensure_ascii=False).encode()).hexdigest()[:12]
+
+
+def firma_edicion(edit):
+    propuesta={k:edit['propuesta'].get(k) for k in ('nombre','descripcion','precio','variantes','categoria','linea')}
+    value={'propuesta':propuesta,'fotos':edit.get('fotos_tmp'),'video':edit.get('video_tmp'),'portada':edit.get('portada',0),'media':edit.get('media_cambiada',False)}
+    return hashlib.sha256(json.dumps(value,sort_keys=True,ensure_ascii=False).encode()).hexdigest()
+
+
+def accion_fotos(data):
+    return data in ('fotos_listo','carga_quitar_foto','carga_quitar_video','ed_orden','ed_quitar_video') or data.startswith(('portada:','ed_portada:','ed_quitar:','ed_reemplazar:'))
+
+
+def vincular_fotos(result,target,generacion):
+    signature=firma_fotos(target,generacion)
+    for row in result.get('botones',[]):
+        for button in row:
+            if accion_fotos(button.get('data','')):button['data']+='~'+signature
+    return result
+
+
 def con_mosaico(a,result,target):
     photos=target.get('fotos_tmp',[])
     if not photos:return result
@@ -151,7 +174,7 @@ def pregunta(a,ses):
         if n:result['botones'].append([boton('Quitar última foto','carga_quitar_foto')])
         if ses['modelo'].get('video_tmp'):result['botones'].append([boton('Quitar video','carga_quitar_video')])
     result['botones'] += [[boton('↩️ Volver','atras'),boton('💾 Guardar y salir','menu')]]
-    return con_mosaico(a,result,ses['modelo']) if step=='fotos' else result
+    return con_mosaico(a,vincular_fotos(result,ses['modelo'],ses.get('carga_id')),ses['modelo']) if step=='fotos' else result
 
 
 def editar_menu(a,edit):
@@ -173,7 +196,8 @@ def editar_fotos(a,edit):
     rows += [[boton('Ordenar fotos','ed_orden'),boton('🌐 Subir archivos','subir:edicion')]]
     if edit.get('video_tmp'):rows.append([boton('Quitar video','ed_quitar_video')])
     rows += [[boton('Volver a datos','ed_volver'),boton('💾 Guardar cambios','ed_guardar')]]
-    return con_mosaico(a,a.msg(f"{edit['codigo']}: {len(photos)} fotos y {'un video' if edit.get('video_tmp') else 'sin video'}.\nMandame más fotos o un video, elegí portada, reemplazá o reordená. Los cambios se aplican al guardar.",rows),edit)
+    result=a.msg(f"{edit['codigo']}: {len(photos)} fotos y {'un video' if edit.get('video_tmp') else 'sin video'}.\nMandame más fotos o un video, elegí portada, reemplazá o reordená. Los cambios se aplican al guardar.",rows)
+    return con_mosaico(a,vincular_fotos(result,edit,edit['id']),edit)
 
 
 def valid_texto(a,campo,text):
@@ -213,7 +237,8 @@ def recibir_media(a,uid,message,target):
         a.descargar_de_telegram(obj['file_id'],dest)
     except a.DescargaTelegramError as error:
         dest.unlink(missing_ok=True)
-        a.registrar_error(error.codigo)
+        if error.detalle:a.registrar_error(error.codigo,error.detalle)
+        else:a.registrar_error(error.codigo)
         if error.grande:return 'grande'
         raise MediaError(str(error)) from None
     except Exception:
@@ -235,6 +260,7 @@ def recibir_media(a,uid,message,target):
                 return 'foto'
     entry={'archivo':dest.relative_to(a.DATA).as_posix(),'file_id':obj['file_id'],'msg':message.get('message_id',0),'sha256':digest}
     if obj.get('file_unique_id'):entry['file_unique_id']=obj['file_unique_id']
+    if message.get('media_group_id'):entry['grupo']=str(message['media_group_id'])[:128]
     if kind=='foto':
         replace=target.pop('reemplazar',None)
         if replace is not None:
@@ -244,6 +270,13 @@ def recibir_media(a,uid,message,target):
             if len(target.setdefault('fotos_tmp',[]))>=10:
                 dest.unlink(missing_ok=True);raise MediaError('El máximo es diez fotos. Quitá alguna antes de agregar más.')
             target['fotos_tmp'].append(entry)
+            # Las descargas pueden terminar en distinto orden; mantener el orden del álbum original.
+            if entry.get('grupo'):
+                photos=target['fotos_tmp'];indices=[i for i,f in enumerate(photos) if f.get('grupo')==entry['grupo']]
+                portada=photos[target.get('portada',0)] if (target.get('portada_elegida') or target.get('propuesta')) else None
+                ordered=sorted((photos[i] for i in indices),key=lambda f:f['msg'] if type(f.get('msg')) is int else 0)
+                for i,f in zip(indices,ordered):photos[i]=f
+                if portada is not None:target['portada']=next(i for i,f in enumerate(photos) if f is portada)
     else:
         if target.get('reemplazar') is not None:raise MediaError('Para reemplazar una foto enviá una imagen.')
         target['video_tmp']=entry
@@ -276,10 +309,17 @@ def procesar(update,a):
                 ses['foco']='carga';save()
             elif not ses.get('paso') and ses.get('edicion',{}).get('campo')=='media':
                 ses['foco']='edicion';save()
-        guardando=data in ('fotos_listo','ed_guardar') or (data.startswith('ok:') and ses.get('confirmacion',{}).get('accion')=='ed_guardar')
-        if guardando:
+        base=data.split('~',1)[0]
+        guardando=base in ('fotos_listo','ed_guardar') or (data.startswith('ok:') and ses.get('confirmacion',{}).get('accion')=='ed_guardar')
+        if guardando or accion_fotos(base):
             with _ALBUM_LOCK:pendiente=bool(_MEDIA_PENDIENTE.get(uid))
             if pendiente:return actions+[a.msg('Todavía estoy recibiendo las fotos de este artículo. Esperá el resumen antes de guardar; tu avance se conserva.')]
+        if accion_fotos(base):
+            target=ses.get('edicion',{}) if base.startswith('ed_') else ses.get('modelo',{})
+            generacion=target.get('id') if base.startswith('ed_') else ses.get('carga_id')
+            if '~' not in data or data.split('~',1)[1]!=firma_fotos(target,generacion):
+                return actions+[a.msg('Esos botones corresponden a una vista anterior. Volvé a abrir las fotos para usar los actuales.',[[boton('Revisar fotos','ed_fotos' if base.startswith('ed_') else 'continuar')]])]
+            data=base
         def model(code):
             return next((m for m in a.leer_json(a.MODELOS_FILE,[]) if m.get('codigo')==code),None)
         def cargar_nuevo():
@@ -346,9 +386,14 @@ def procesar(update,a):
                 if action=='ed_guardar':
                     edit=ses.get('edicion')
                     if not edit or edit['codigo']!=code or edit['id']!=pending.get('edicion_id'):raise PublicacionError('La edición cambió. Volvé a revisarla.')
+                    recibo={'id':edit['id'],'firma':firma_edicion(edit)}
+                    if current.get('ultima_edicion')==recibo:
+                        ses.pop('edicion',None);ses.pop('confirmacion',None);save()
+                        return actions+[a.msg('Ese cambio ya estaba guardado. Lo recuperé sin repetirlo.'),ficha(a,current)]
                     if revision(current)!=edit['revision']:raise PublicacionError('Otra persona modificó el modelo. Descartá esta edición y volvé a abrirlo para ver los datos actuales.')
                     changes={k:edit['propuesta'].get(k) for k in ('nombre','descripcion','precio','variantes','categoria','linea')}
                     if edit.get('media_cambiada'):changes.update(materializar(a,code,edit['fotos_tmp'],edit.get('portada',0),edit.get('video_tmp')))
+                    changes['ultima_edicion']=recibo
                     saved,_=aplicar_modelo(code,changes,models,edit['revision']);ses.pop('edicion',None)
                 else:
                     changes={'publicar':{'estado':'publicado'},'ocultar':{'estado':'oculto'},'descartar':{'estado':'descartado'},'recuperar':{'estado':'borrador'},'aprobar':{'aprobado_comercialmente':True},'desaprobar':{'aprobado_comercialmente':False}}[action]
@@ -449,7 +494,7 @@ def procesar(update,a):
             if data.startswith('portada:') and ses.get('paso')=='fotos':
                 i=int(data.split(':')[1])
                 if not 0<=i<len(ses['modelo'].get('fotos_tmp',[])):raise PublicacionError('Esa foto no está disponible.')
-                ses['modelo']['portada']=i;save();return actions+[pregunta(a,ses)]
+                ses['modelo']['portada']=i;ses['modelo']['portada_elegida']=True;save();return actions+[pregunta(a,ses)]
             if data in ('carga_quitar_foto','carga_quitar_video') and ses.get('paso')=='fotos':
                 if data=='carga_quitar_video':ses['modelo'].pop('video_tmp',None)
                 elif ses['modelo'].get('fotos_tmp'):ses['modelo']['fotos_tmp'].pop();ses['modelo']['portada']=0
@@ -457,10 +502,16 @@ def procesar(update,a):
             if data=='fotos_listo' and ses.get('paso')=='fotos':
                 mod=ses['modelo'];photos=mod.get('fotos_tmp',[])
                 if not photos:return actions+[a.msg('Falta al menos una foto.'),pregunta(a,ses)]
-                models=a.leer_json(a.MODELOS_FILE,[]);cat=a.buscar_categoria(mod['categoria']);code=a.siguiente_codigo(models,cat['codigo'])
+                ses.setdefault('carga_id',uuid.uuid4().hex);save()
+                models=a.leer_json(a.MODELOS_FILE,[])
+                recuperado=next((m for m in models if m.get('origen_carga')==ses['carga_id']),None)
+                if recuperado:
+                    for key in ('paso','modelo','carga_id'):ses.pop(key,None)
+                    save();return actions+[a.msg('Este borrador ya estaba guardado. Lo recuperé sin crear otro.'),ficha(a,recuperado),menu(a,ses)]
+                cat=a.buscar_categoria(mod['categoria']);code=a.siguiente_codigo(models,cat['codigo'])
                 nuevo={k:mod.get(k) for k in ('categoria','linea','nombre','descripcion','precio','variantes')}
                 nuevo.update(materializar(a,code,photos,mod.get('portada',0),mod.get('video_tmp')))
-                nuevo.update({'codigo':code,'estado':'borrador','aprobado_comercialmente':False,'creado':datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='seconds')})
+                nuevo.update({'codigo':code,'estado':'borrador','aprobado_comercialmente':False,'origen_carga':ses['carga_id'],'creado':datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='seconds')})
                 validar(nuevo)
                 models.append(nuevo);a.escribir_json(a.MODELOS_FILE,models)
                 for key in ('paso','modelo','carga_id'):ses.pop(key,None)

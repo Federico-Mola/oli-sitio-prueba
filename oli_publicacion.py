@@ -87,9 +87,13 @@ def aplicar_modelo(codigo, cambios, modelos, revision_esperada=None):
     original = coincidencias[0]
     if revision_esperada and revision(original) != revision_esperada:
         raise PublicacionError("Otra persona cambió este modelo. Volvé a abrirlo antes de guardar.")
-    permitidos = {"nombre", "descripcion", "precio", "variantes", "categoria", "linea", "fotos", "fotos_tg", "video", "estado", "aprobado_comercialmente", "imagen_social"}
+    permitidos = {"nombre", "descripcion", "precio", "variantes", "categoria", "linea", "fotos", "fotos_tg", "video", "estado", "aprobado_comercialmente", "imagen_social", "ultima_edicion"}
     if set(cambios) - permitidos:
         raise PublicacionError("Ese cambio no está permitido.")
+    if 'ultima_edicion' in cambios:
+        recibo=cambios['ultima_edicion']
+        if not isinstance(recibo,dict) or set(recibo)!={'id','firma'} or not re.fullmatch(r'[0-9a-f]{32}',str(recibo['id'])) or not re.fullmatch(r'[0-9a-f]{64}',str(recibo['firma'])):
+            raise PublicacionError('No pude comprobar la edición. Volvé a revisarla.')
     nuevo = copy.deepcopy(modelos)
     mod = next(m for m in nuevo if m["codigo"] == codigo)
     mod.update(copy.deepcopy(cambios))

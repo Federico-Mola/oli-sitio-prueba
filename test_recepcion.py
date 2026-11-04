@@ -33,7 +33,7 @@ class RecepcionTests(unittest.TestCase):
         with patch.object(api,'telegram',side_effect=[TimeoutError('no mostrar URL'),self.info()]) as get,patch.object(api.urllib.request,'urlopen',return_value=self.response()):
             api.descargar_de_telegram('fixture',self.dest)
         self.assertEqual(self.dest.read_bytes(),self.photo);self.assertEqual(get.call_count,2)
-        self.assertEqual(get.call_args.kwargs['timeout'],7)
+        self.assertEqual(get.call_args.kwargs['timeout'],20)
 
     def test_reintenta_transferencia_cortada(self):
         with patch.object(api,'telegram',return_value=self.info()),patch.object(api.urllib.request,'urlopen',side_effect=[ConnectionResetError(),self.response()]):

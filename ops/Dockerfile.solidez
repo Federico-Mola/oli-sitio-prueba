@@ -1,0 +1,3 @@
+# Refuerzo de recepción y guardado; mantiene galería, recursos y configuración del sitio.
+FROM oli-sitio-prueba:album-v1.1
+COPY oli_api.py oli_gestion.py oli_eventos.py oli_upload.py oli_publicacion.py /app/
