@@ -1,0 +1,3 @@
+# Renovar el nombre de la línea de Navidad conservando las referencias de productos.
+FROM oli-sitio-prueba:lineas-velas-v1
+COPY data/catalogo.json /app/data/catalogo.json
