@@ -1,0 +1,3 @@
+# Actualizar el catálogo compartido por el bot y las páginas, sin cambiar productos.
+FROM oli-sitio-prueba:caja-fosforos-v1
+COPY data/catalogo.json /app/data/catalogo.json
