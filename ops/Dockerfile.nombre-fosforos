@@ -1,0 +1,3 @@
+# Corregir únicamente los textos del catálogo; conservar identificadores y datos de productos.
+FROM oli-sitio-prueba:subida-solida-v1
+COPY data/catalogo.json /app/data/catalogo.json
