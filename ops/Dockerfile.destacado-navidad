@@ -1,0 +1,3 @@
+# Renovar el destacado de portada, conservando el logo y todos los recursos publicados.
+FROM oli-sitio-prueba:frase-inicio-v1
+COPY build.py /app/build.py
