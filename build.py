@@ -125,6 +125,7 @@ css += """
 .oli-wholesale-note{text-align:center;margin:28px 0 0;color:#766c5f;font-size:.95rem}
 .oli-wholesale-note a{color:#c97c79;font-weight:700;text-decoration:none}
 @media screen and (max-width:479px){.oli-models-wrap{padding:0 16px}.oli-model-grid{grid-template-columns:1fr 1fr;gap:12px}.oli-model-body{padding:12px}.oli-model-name{font-size:1rem}.oli-model-desc{display:none}.oli-model-card .oli-btn{padding:10px 8px;font-size:.8rem;white-space:normal;line-height:1.25}}
+.oli-hero-portrait{background-image:url("/img/logo-oli-bienvenida.jpg");background-position:center;background-size:contain;background-repeat:no-repeat;background-color:#fff;background-origin:content-box;padding:16px}
 .oli-only-phone{display:none}
 @media screen and (max-width:479px){
 .oli-cat-grid{grid-template-columns:1fr 1fr;grid-column-gap:12px;grid-row-gap:12px}
@@ -149,6 +150,10 @@ css += """
 """
 (SITE / "css").mkdir(parents=True, exist_ok=True)
 (SITE / "css" / "oli.css").write_text(css)
+# Logo oficial sin recrear ni recortar; compartido por cada regeneración del sitio.
+(SITE / "img").mkdir(parents=True, exist_ok=True)
+from shutil import copyfile
+copyfile(ROOT / "data/logo-oli-bienvenida.jpg", SITE / "img/logo-oli-bienvenida.jpg")
 import hashlib
 CSS_V = hashlib.md5(css.encode()).hexdigest()[:8]
 
@@ -263,7 +268,7 @@ def write(path, content):
 pages = []
 
 # --- Home ---
-HOME_BODY = f'''<div><section class="oli-hero"><div class="oli-hero-wrap"><div class="oli-hero-copy"><p class="oli-eyebrow">Hecho a mano en Uruguay</p><h1 class="oli-h1">Hola, soy Oli y te doy la bienvenida a mi tiendita!</h1><p class="oli-lead">Oli es un producto 100% artesanal, de principio a fin, hecho con todo el amor que llevamos dentro — porque todo lo que podemos brindarte es todo lo que somos.</p><div class="oli-hero-actions"><a href="{WA}" class="oli-btn">Escribinos por WhatsApp</a><a href="#categorias" class="oli-btn-ghost">Ver categorías</a></div><p class="oli-slogan">“En Oli hacemos arte para el pelo, arte en tela, arte para tu hogar y tu vida! <span class="oli-emoji">❤️</span>”</p></div><div class="oli-hero-portrait"></div></div></section><div class="oli-trust"><div class="oli-trust-wrap"><span class="oli-trust-item">🧵 100% artesanal</span><span class="oli-trust-item">🏡 Hecho en Uruguay</span><span class="oli-trust-item">📦 Envíos a todo el país</span></div></div></div>
+HOME_BODY = f'''<div><section class="oli-hero"><div class="oli-hero-wrap"><div class="oli-hero-copy"><p class="oli-eyebrow">Hecho a mano en Uruguay</p><h1 class="oli-h1">Hola, soy Oli y te doy la bienvenida a mi tiendita!</h1><p class="oli-lead">Oli es un producto 100% artesanal, de principio a fin, hecho con todo el amor que llevamos dentro — porque todo lo que podemos brindarte es todo lo que somos.</p><div class="oli-hero-actions"><a href="{WA}" class="oli-btn">Escribinos por WhatsApp</a><a href="#categorias" class="oli-btn-ghost">Ver categorías</a></div><p class="oli-slogan">“En Oli hacemos arte para el pelo, arte en tela, arte para tu hogar y tu vida! <span class="oli-emoji">❤️</span>”</p></div><div class="oli-hero-portrait" role="img" aria-label="Logo de Oli"></div></div></section><div class="oli-trust"><div class="oli-trust-wrap"><span class="oli-trust-item">🧵 100% artesanal</span><span class="oli-trust-item">🏡 Hecho en Uruguay</span><span class="oli-trust-item">📦 Envíos a todo el país</span></div></div></div>
 <section class="oli-featured-section"><p class="oli-featured-eyebrow">Destacado del mes</p><h2 class="oli-featured-title">Moñas Clásicas</h2><p class="oli-featured-desc">Nuestro clásico de siempre — 4 tamaños y 5 tipos para elegir. El favorito de este mes, hecho a mano con todo el cariño de Oli.</p><a href="/lineas-de-producto/monas-clasicas" class="oli-btn">Ver este producto</a></section>
 <section id="categorias" class="oli-cat-section"><div class="oli-section-wrap"><p class="oli-eyebrow oli-eyebrow-center">Nuestras categorías</p><h2 class="oli-h2-script">Cada tipo de magia, en su propio rincón</h2><div class="oli-cat-grid">
 <a id="accesorios" href="/accesorios" class="oli-cat-card oli-cat-mustard"><span class="oli-cat-body"><span class="oli-cat-name oli-cat-name-light">Accesorios</span><span class="oli-cat-tag oli-cat-tag-light">Foto real</span></span></a>
@@ -282,7 +287,7 @@ pages.append(write("/", page(
     "La tiendita de Oli | Accesorios artesanales hechos a mano en Uruguay",
     "Moñas, accesorios, cordones, velas y más, hechos a mano con amor en Uruguay. Consultá por WhatsApp.",
     "/", HOME_BODY,
-    '<link rel="preload" href="/img/hola-soy-oli.webp" as="image" fetchpriority="high">', wrap=True)))
+    '<link rel="preload" href="/img/logo-oli-bienvenida.jpg" as="image" fetchpriority="high">', wrap=True)))
 
 # --- Modelos ---
 try:

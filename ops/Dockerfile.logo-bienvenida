@@ -1,0 +1,4 @@
+# Sustituir la imagen de bienvenida por el logo oficial, manteniendo el resto del sitio.
+FROM oli-sitio-prueba:linea-navidad-v1
+COPY build.py /app/build.py
+COPY data/logo-oli-bienvenida.jpg /app/data/logo-oli-bienvenida.jpg
