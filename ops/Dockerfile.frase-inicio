@@ -1,0 +1,3 @@
+# Quitar solo las comillas de la frase inicial; conservar recursos y datos existentes.
+FROM oli-sitio-prueba:logo-bienvenida-v1
+COPY build.py /app/build.py
