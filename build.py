@@ -127,6 +127,7 @@ css += """
 @media screen and (max-width:479px){.oli-models-wrap{padding:0 16px}.oli-model-grid{grid-template-columns:1fr 1fr;gap:12px}.oli-model-body{padding:12px}.oli-model-name{font-size:1rem}.oli-model-desc{display:none}.oli-model-card .oli-btn{padding:10px 8px;font-size:.8rem;white-space:normal;line-height:1.25}}
 .oli-hero-portrait{background-image:url("/img/logo-oli-bienvenida.jpg");background-position:center;background-size:contain;background-repeat:no-repeat;background-color:#fff;background-origin:content-box;padding:16px}
 .oli-featured-section{background-image:linear-gradient(#453f3870,#453f38d9),url("/img/navidad-pascuas-oli.webp");background-position:center}
+.oli-video{height:auto;aspect-ratio:480/854;object-fit:contain}
 .oli-only-phone{display:none}
 @media screen and (max-width:479px){
 .oli-cat-grid{grid-template-columns:1fr 1fr;grid-column-gap:12px;grid-row-gap:12px}
