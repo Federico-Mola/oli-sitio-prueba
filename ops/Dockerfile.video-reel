@@ -1,0 +1,4 @@
+# Reemplazar el video de la portada por el reel autorizado, servido desde el propio VPS.
+FROM oli-sitio-prueba:destacado-navidad-v1
+COPY build.py /app/build.py
+COPY nginx.conf /etc/nginx/conf.d/default.conf

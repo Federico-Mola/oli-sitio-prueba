@@ -9,3 +9,6 @@ actualizar_base.py
 *.pem
 *.olibak
 provider.json
+
+# Videos editoriales del propietario: solo VPS y respaldos privados.
+data/oli-reel-*.mp4

@@ -159,7 +159,7 @@ import hashlib
 CSS_V = hashlib.md5(css.encode()).hexdigest()[:8]
 
 # video (se carga recién cuando entra en pantalla)
-assets.append(("https://cdn.prod.website-files.com/6a90d29afcc3908981f2b9b4/6a917d0f3c816267db826463_oli-video.mp4", "media/oli-video.mp4", 0))
+# El reel editorial se sirve desde /data/media/editorial, fuera del repositorio.
 
 (ROOT / "assets.txt").write_text("".join(f"{u} {d} {w}\n" for u, d, w in assets))
 
@@ -279,7 +279,7 @@ HOME_BODY = f'''<div><section class="oli-hero"><div class="oli-hero-wrap"><div c
 <a id="navidad" href="/navidad" class="oli-cat-card oli-cat-rose-deep"><span class="oli-cat-body"><span class="oli-cat-name oli-cat-name-light">Navidad</span><span class="oli-cat-tag oli-cat-tag-light">Foto real</span></span></a>
 <a id="cat-pascuas" href="/pascuas" class="oli-cat-card oli-cat-rose"><span class="oli-cat-body"><span class="oli-cat-name oli-cat-name-light">Pascuas</span><span class="oli-cat-tag oli-cat-tag-light">Foto real</span></span></a>
 </div></div></section>
-<section class="oli-video-section"><div class="oli-video-wrap"><video controls playsinline loop muted autoplay preload="none" data-src="/media/oli-video.mp4" class="oli-video"></video></div></section>
+<section class="oli-video-section"><div class="oli-video-wrap"><video controls playsinline loop muted autoplay preload="none" data-src="/media/editorial/oli-reel-DGahzmsxbqM.mp4" class="oli-video" width="480" height="854" aria-label="Video de accesorios Oli"></video></div></section>
 <section class="oli-editorial-section"><div class="oli-editorial-wrap"><p class="oli-eyebrow">Detrás de cada pieza</p><p class="oli-pull">“Nuestros productos son más que accesorios: son historias, son emociones, son experiencias — y muchas pruebas y errores.”</p><p class="oli-editorial-p">Todo lo que vas a encontrar en esta página está hecho de forma artesanal, manualmente, pieza por pieza. Nada es al azar.</p><p class="oli-editorial-p">Imperfectos, como todo lo hecho a mano — pero esa imperfección se nos volvió esencia. Cada producto que te llevás es una representación del amor y la dedicación que le ponemos.</p><p class="oli-editorial-p">Somos producto artesanal, 100% hecho en Uruguay, y eso es un valor agregado. Espero que esta experiencia sea mágica — porque sí, en Oli creemos en la magia. ✨</p></div></section>
 <section class="oli-wholesale-section"><div class="oli-wholesale-wrap"><h2 class="oli-wholesale-h2">¿Tenés una tienda y querés llenarla de magia?</h2><p class="oli-wholesale-p">También armamos pedidos al por mayor. Escribile a Euge y coordinamos juntas los precios y los tiempos de entrega — con el mismo cariño de siempre, pero a lo grande.</p><a href="{WA}" class="oli-btn oli-btn-mustard">Hablar con Euge por WhatsApp</a></div></section>'''
 
